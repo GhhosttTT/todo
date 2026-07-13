@@ -10,6 +10,7 @@ interface IpcDependencies {
   windowController: WindowController;
   runtime: RuntimeStatus;
   registerShortcut: (accelerator: string) => { ok: boolean; error?: string };
+  onStoreChanged?: () => void;
   transientSettings?: Partial<Settings>;
 }
 
@@ -31,6 +32,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   const mutation = async (action: () => Promise<ReturnType<TaskStore['getSnapshot']>>): Promise<MutationResult> => {
     try {
       const changed = await action();
+      deps.onStoreChanged?.();
       broadcast();
       return result(changed);
     } catch (error) {
@@ -55,6 +57,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       undo.clear();
       const token = crypto.randomUUID();
       undo.set(token, { task: deleted, expiresAt: Date.now() + 8000 });
+      deps.onStoreChanged?.();
       broadcast();
       return result(changed, { undoToken: token });
     } catch (error) {

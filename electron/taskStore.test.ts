@@ -27,12 +27,27 @@ describe('TaskStore', () => {
   it('persists mutations and reloads them', async () => {
     const store = createStore();
     store.load();
-    const changed = await store.createTask(0, { title: 'Persistent task', dueDate: '2026-07-13' });
+    const changed = await store.createTask(0, { title: 'Persistent task', dueDate: '2026-07-13', remindAt: '2026-07-13T09:30:00.000Z' });
     expect(changed.revision).toBe(1);
 
     const reloaded = new TaskStore(store.stateFile).load();
     expect(reloaded.tasks[0].title).toBe('Persistent task');
+    expect(reloaded.tasks[0].remindAt).toBe('2026-07-13T09:30:00.000Z');
     expect(reloaded.revision).toBe(1);
+  });
+
+  it('marks reminders notified and resets notification state when reminder time changes', async () => {
+    const store = createStore();
+    store.load();
+    const created = await store.createTask(0, { title: 'Reminder', remindAt: '2026-07-13T09:30:00.000Z' });
+    const task = created.tasks[0];
+
+    const notified = await store.markReminderNotified(task.id, '2026-07-13T09:30:00.000Z');
+    expect(notified.tasks[0].notifiedAt).toEqual(expect.any(String));
+
+    const changed = await store.updateTask(notified.revision, { id: task.id, remindAt: '2026-07-13T10:30:00.000Z' });
+    expect(changed.tasks[0].remindAt).toBe('2026-07-13T10:30:00.000Z');
+    expect(changed.tasks[0].notifiedAt).toBeNull();
   });
 
   it('rejects stale revisions', async () => {

@@ -8,6 +8,8 @@ export interface Task {
   title: string;
   notes: string;
   dueDate: string | null;
+  remindAt: string | null;
+  notifiedAt: string | null;
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -65,6 +67,7 @@ export interface CreateTaskInput {
   title: string;
   notes?: string;
   dueDate?: string | null;
+  remindAt?: string | null;
   baseRevision: number;
 }
 
@@ -73,6 +76,7 @@ export interface UpdateTaskInput {
   title?: string;
   notes?: string;
   dueDate?: string | null;
+  remindAt?: string | null;
   baseRevision: number;
 }
 

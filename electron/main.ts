@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import type { AppSnapshot, RuntimeStatus } from '../src/types';
 import { DesktopLayer } from './desktopLayer';
 import { clearIpcHandlers, registerIpcHandlers } from './ipc';
+import { ReminderScheduler } from './reminderScheduler';
 import { resolvePathsFromEnvironment } from './runtimePaths';
 import { TaskStore } from './taskStore';
 import { WindowController } from './windowController';
@@ -13,6 +14,7 @@ const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const appRoot = app.isPackaged ? dirname(process.execPath) : process.cwd();
 const defaultUserData = app.getPath('userData');
 const paths = resolvePathsFromEnvironment(appRoot, defaultUserData);
+if (process.platform === 'win32') app.setAppUserModelId('com.ghhostttt.todo');
 const capturePath = process.argv.find((argument) => argument.startsWith('--todo-capture='))?.slice('--todo-capture='.length)
   ?? process.env.TODO_CAPTURE_PATH;
 const captureSize = process.argv.find((argument) => argument.startsWith('--todo-capture-size='))?.slice('--todo-capture-size='.length);
@@ -28,6 +30,7 @@ if (!hasSingleInstanceLock) app.quit();
 let mainWindow: BrowserWindow | undefined;
 let tray: Tray | undefined;
 let controller: WindowController | undefined;
+let reminders: ReminderScheduler | undefined;
 let quitting = false;
 let activeShortcut: string | undefined;
 let boundsSaveTimer: NodeJS.Timeout | undefined;
@@ -130,6 +133,7 @@ async function createWindow(): Promise<void> {
   });
   mainWindow.setOpacity(loaded.settings.opacity);
   controller = new WindowController(mainWindow, desktopLayer, runtime, broadcastRuntime);
+  reminders = new ReminderScheduler(store, broadcastSnapshot, () => { void controller?.setEditing(true); });
   mainWindow.setBounds(controller.safeBounds(loaded.settings.windowBounds));
 
   registerIpcHandlers({
@@ -138,9 +142,11 @@ async function createWindow(): Promise<void> {
     windowController: controller,
     runtime,
     registerShortcut: registerGlobalShortcut,
+    onStoreChanged: () => reminders?.scheduleAll(),
     transientSettings: captureTheme ? { theme: captureTheme } : undefined,
   });
   registerGlobalShortcut(loaded.settings.globalShortcut);
+  reminders.scheduleAll();
   createTray();
 
   mainWindow.on('close', (event) => {
@@ -228,6 +234,7 @@ app.on('will-quit', () => {
   if (boundsSaveTimer) clearTimeout(boundsSaveTimer);
   globalShortcut.unregisterAll();
   clearIpcHandlers();
+  reminders?.clear();
   store.releaseLock();
   tray?.destroy();
 });

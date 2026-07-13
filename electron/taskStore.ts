@@ -14,7 +14,7 @@ import { createRequire } from 'node:module';
 import { applyVisibleOrder, isValidDateKey } from '../src/domain/tasks';
 import type { Settings, Task, ViewId } from '../src/types';
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const require = createRequire(import.meta.url);
 type ReplaceFileApi = (replaced: string, replacement: string, backup: string, flags: number, exclude: null, reserved: null) => boolean;
 let replaceFileApi: ReplaceFileApi | undefined;
@@ -87,6 +87,10 @@ function isViewId(value: unknown): value is ViewId {
   return value === 'today' || value === 'scheduled' || value === 'all';
 }
 
+function isValidTimestamp(value: string | null): boolean {
+  return value === null || (typeof value === 'string' && Number.isFinite(Date.parse(value)));
+}
+
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
@@ -98,6 +102,10 @@ function parseTask(value: unknown): Task | null {
   if (typeof item.id !== 'string' || !title || title.length > 300) return null;
   const dueDate = item.dueDate === null || typeof item.dueDate === 'string' ? item.dueDate : null;
   if (!isValidDateKey(dueDate)) return null;
+  const remindAt = item.remindAt === null || typeof item.remindAt === 'string' ? item.remindAt : null;
+  if (!isValidTimestamp(remindAt)) return null;
+  const notifiedAt = item.notifiedAt === null || typeof item.notifiedAt === 'string' ? item.notifiedAt : null;
+  if (!isValidTimestamp(notifiedAt)) return null;
   const createdAt = typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString();
   const updatedAt = typeof item.updatedAt === 'string' ? item.updatedAt : createdAt;
   return {
@@ -105,6 +113,8 @@ function parseTask(value: unknown): Task | null {
     title,
     notes: typeof item.notes === 'string' ? item.notes.slice(0, 10_000) : '',
     dueDate,
+    remindAt,
+    notifiedAt,
     completedAt: typeof item.completedAt === 'string' ? item.completedAt : null,
     createdAt,
     updatedAt,
@@ -268,10 +278,11 @@ export class TaskStore {
     return this.getSnapshot();
   }
 
-  createTask(baseRevision: number, input: { title: string; notes?: string; dueDate?: string | null }): Promise<StoreSnapshot> {
+  createTask(baseRevision: number, input: { title: string; notes?: string; dueDate?: string | null; remindAt?: string | null }): Promise<StoreSnapshot> {
     const title = input.title.trim();
     if (!title || title.length > 300) return Promise.reject(new Error('任务标题长度必须为 1 到 300 个字符。'));
     if (!isValidDateKey(input.dueDate ?? null)) return Promise.reject(new Error('截止日期格式无效。'));
+    if (!isValidTimestamp(input.remindAt ?? null)) return Promise.reject(new Error('提醒时间格式无效。'));
     return this.mutate(baseRevision, (draft) => {
       const now = new Date().toISOString();
       const nextOrder = draft.tasks.reduce((max, task) => Math.max(max, task.sortOrder), -1000) + 1000;
@@ -280,6 +291,8 @@ export class TaskStore {
         title,
         notes: (input.notes ?? '').slice(0, 10_000),
         dueDate: input.dueDate ?? null,
+        remindAt: input.remindAt ?? null,
+        notifiedAt: null,
         completedAt: null,
         createdAt: now,
         updatedAt: now,
@@ -288,15 +301,20 @@ export class TaskStore {
     });
   }
 
-  updateTask(baseRevision: number, input: { id: string; title?: string; notes?: string; dueDate?: string | null }): Promise<StoreSnapshot> {
+  updateTask(baseRevision: number, input: { id: string; title?: string; notes?: string; dueDate?: string | null; remindAt?: string | null }): Promise<StoreSnapshot> {
     if (input.title !== undefined && (!input.title.trim() || input.title.trim().length > 300)) return Promise.reject(new Error('任务标题长度必须为 1 到 300 个字符。'));
     if (input.dueDate !== undefined && !isValidDateKey(input.dueDate)) return Promise.reject(new Error('截止日期格式无效。'));
+    if (input.remindAt !== undefined && !isValidTimestamp(input.remindAt)) return Promise.reject(new Error('提醒时间格式无效。'));
     return this.mutate(baseRevision, (draft) => {
       const task = draft.tasks.find(({ id }) => id === input.id);
       if (!task) throw new Error('任务不存在。');
       if (input.title !== undefined) task.title = input.title.trim();
       if (input.notes !== undefined) task.notes = input.notes.slice(0, 10_000);
       if (input.dueDate !== undefined) task.dueDate = input.dueDate;
+      if (input.remindAt !== undefined && task.remindAt !== input.remindAt) {
+        task.remindAt = input.remindAt;
+        task.notifiedAt = null;
+      }
       task.updatedAt = new Date().toISOString();
     });
   }
@@ -334,6 +352,15 @@ export class TaskStore {
   updateSettings(baseRevision: number, settings: Partial<Settings>): Promise<StoreSnapshot> {
     return this.mutate(baseRevision, (draft) => {
       draft.settings = parseSettings({ ...draft.settings, ...settings });
+    });
+  }
+
+  markReminderNotified(id: string, remindAt: string): Promise<StoreSnapshot> {
+    return this.mutate(this.state.revision, (draft) => {
+      const task = draft.tasks.find((item) => item.id === id);
+      if (!task || task.completedAt || task.remindAt !== remindAt || task.notifiedAt) return;
+      task.notifiedAt = new Date().toISOString();
+      task.updatedAt = task.notifiedAt;
     });
   }
 

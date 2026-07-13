@@ -4,6 +4,7 @@ import {
   Check,
   CircleAlert,
   CirclePlus,
+  Clock3,
   GripVertical,
   HardDrive,
   Inbox,
@@ -34,6 +35,7 @@ interface DraftTask {
   title: string;
   notes: string;
   dueDate: string;
+  remindAt: string;
 }
 
 function dueDateForView(view: ViewId): string {
@@ -42,13 +44,30 @@ function dueDateForView(view: ViewId): string {
   return '';
 }
 
+function toDateTimeInput(value: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? format(date, "yyyy-MM-dd'T'HH:mm") : '';
+}
+
+function fromDateTimeInput(value: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+function formatReminder(value: string): string {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? format(date, 'yyyy-MM-dd HH:mm') : value;
+}
+
 function App() {
   const [snapshot, setSnapshot] = useState<AppSnapshot | null>(null);
   const [query, setQuery] = useState('');
   const [composerOpen, setComposerOpen] = useState(false);
-  const [composer, setComposer] = useState<DraftTask>({ title: '', notes: '', dueDate: '' });
+  const [composer, setComposer] = useState<DraftTask>({ title: '', notes: '', dueDate: '', remindAt: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<DraftTask>({ title: '', notes: '', dueDate: '' });
+  const [draft, setDraft] = useState<DraftTask>({ title: '', notes: '', dueDate: '', remindAt: '' });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutDraft, setShortcutDraft] = useState('Ctrl+Alt+T');
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -102,7 +121,7 @@ function App() {
   };
 
   const openComposer = () => {
-    setComposer({ title: '', notes: '', dueDate: dueDateForView(view) });
+    setComposer({ title: '', notes: '', dueDate: dueDateForView(view), remindAt: '' });
     setComposerOpen(true);
     setEditingId(null);
   };
@@ -112,18 +131,19 @@ function App() {
     const result = await window.todo.createTask({
       ...composer,
       dueDate: composer.dueDate || null,
+      remindAt: fromDateTimeInput(composer.remindAt),
       baseRevision: snapshot.revision,
     });
     if (applyResult(result)) {
       setComposerOpen(false);
-      setComposer({ title: '', notes: '', dueDate: '' });
+      setComposer({ title: '', notes: '', dueDate: '', remindAt: '' });
     }
   };
 
   const beginEdit = (task: Task) => {
     if (!editing) return;
     setEditingId(task.id);
-    setDraft({ title: task.title, notes: task.notes, dueDate: task.dueDate ?? '' });
+    setDraft({ title: task.title, notes: task.notes, dueDate: task.dueDate ?? '', remindAt: toDateTimeInput(task.remindAt) });
     setComposerOpen(false);
   };
 
@@ -134,6 +154,7 @@ function App() {
       title: draft.title,
       notes: draft.notes,
       dueDate: draft.dueDate || null,
+      remindAt: fromDateTimeInput(draft.remindAt),
       baseRevision: snapshot.revision,
     });
     if (applyResult(result)) setEditingId(null);
@@ -278,6 +299,7 @@ function App() {
                 <textarea value={composer.notes} onChange={(event) => setComposer({ ...composer, notes: event.target.value })} placeholder="备注（可选）" maxLength={10000} />
                 <div className="editor-footer">
                   <label><CalendarDays size={15} /><input type="date" value={composer.dueDate} onChange={(event) => setComposer({ ...composer, dueDate: event.target.value })} /></label>
+                  <label><Clock3 size={15} /><input type="datetime-local" value={composer.remindAt} onChange={(event) => setComposer({ ...composer, remindAt: event.target.value })} /></label>
                   <span />
                   <button className="text-button" onClick={() => setComposerOpen(false)}>取消</button>
                   <button className="text-button primary" disabled={!composer.title.trim()} onClick={() => void createTask()}>添加</button>
@@ -315,6 +337,7 @@ function App() {
                       <textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="备注（可选）" maxLength={10000} />
                       <div className="editor-footer">
                         <label><CalendarDays size={15} /><input type="date" value={draft.dueDate} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value })} /></label>
+                        <label><Clock3 size={15} /><input type="datetime-local" value={draft.remindAt} onChange={(event) => setDraft({ ...draft, remindAt: event.target.value })} /></label>
                         <button className="danger-icon" onClick={() => void deleteTask(task.id)} title="删除任务"><Trash2 size={16} /></button>
                         <button className="text-button" onClick={() => setEditingId(null)}>取消</button>
                         <button className="text-button primary" disabled={!draft.title.trim()} onClick={() => void saveTask()}>保存</button>
@@ -323,9 +346,10 @@ function App() {
                   ) : (
                     <button className="task-content" disabled={!editing} onClick={() => beginEdit(task)}>
                       <span className="task-title">{task.title}</span>
-                      {(task.notes || task.dueDate) && (
+                      {(task.notes || task.dueDate || task.remindAt) && (
                         <span className="task-meta">
                           {task.dueDate && <span className={task.dueDate < localDateKey() && !task.completedAt ? 'overdue' : ''}><CalendarDays size={13} />{task.dueDate}</span>}
+                          {task.remindAt && <span><Clock3 size={13} />{formatReminder(task.remindAt)}</span>}
                           {task.notes && <span>{task.notes}</span>}
                         </span>
                       )}
