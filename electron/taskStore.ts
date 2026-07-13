@@ -71,6 +71,7 @@ export function createDefaultSettings(): Settings {
   return {
     selectedView: 'today',
     windowBounds: { x: 120, y: 100, width: 900, height: 620 },
+    theme: 'light',
     globalShortcut: 'Ctrl+Alt+T',
     showCompleted: false,
     opacity: 0.96,
@@ -128,6 +129,7 @@ function parseSettings(value: unknown): Settings {
       displayId: typeof bounds.displayId === 'string' ? bounds.displayId : undefined,
       scaleFactor: finiteNumber(bounds.scaleFactor, 1),
     },
+    theme: item.theme === 'dark' ? 'dark' : 'light',
     globalShortcut: typeof item.globalShortcut === 'string' && item.globalShortcut.trim() ? item.globalShortcut : defaults.globalShortcut,
     showCompleted: typeof item.showCompleted === 'boolean' ? item.showCompleted : defaults.showCompleted,
     opacity: Math.min(1, Math.max(0.72, finiteNumber(item.opacity, defaults.opacity))),

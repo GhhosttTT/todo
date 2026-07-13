@@ -17,6 +17,9 @@ const capturePath = process.argv.find((argument) => argument.startsWith('--todo-
   ?? process.env.TODO_CAPTURE_PATH;
 const captureSize = process.argv.find((argument) => argument.startsWith('--todo-capture-size='))?.slice('--todo-capture-size='.length);
 const captureViewMode = process.argv.includes('--todo-capture-view');
+const captureSettings = process.argv.includes('--todo-capture-settings');
+const captureThemeArgument = process.argv.find((argument) => argument.startsWith('--todo-capture-theme='))?.slice('--todo-capture-theme='.length);
+const captureTheme = captureThemeArgument === 'dark' || captureThemeArgument === 'light' ? captureThemeArgument : undefined;
 if (paths.effectiveMode === 'portable') app.setPath('userData', paths.dataDir);
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -43,7 +46,9 @@ const runtime: RuntimeStatus = {
 };
 
 function snapshot(): AppSnapshot {
-  return { ...store.getSnapshot(), runtime: structuredClone(runtime) };
+  const current = store.getSnapshot();
+  if (captureTheme) current.settings.theme = captureTheme;
+  return { ...current, runtime: structuredClone(runtime) };
 }
 
 function broadcastSnapshot(): void {
@@ -127,7 +132,14 @@ async function createWindow(): Promise<void> {
   controller = new WindowController(mainWindow, desktopLayer, runtime, broadcastRuntime);
   mainWindow.setBounds(controller.safeBounds(loaded.settings.windowBounds));
 
-  registerIpcHandlers({ store, window: mainWindow, windowController: controller, runtime, registerShortcut: registerGlobalShortcut });
+  registerIpcHandlers({
+    store,
+    window: mainWindow,
+    windowController: controller,
+    runtime,
+    registerShortcut: registerGlobalShortcut,
+    transientSettings: captureTheme ? { theme: captureTheme } : undefined,
+  });
   registerGlobalShortcut(loaded.settings.globalShortcut);
   createTray();
 
@@ -167,6 +179,23 @@ async function createWindow(): Promise<void> {
       const bounds = mainWindow.getBounds();
       mainWindow.setBounds({ ...bounds, width: Math.max(680, width), height: Math.max(460, height) }, false);
       mainWindow.setContentSize(Math.max(680, width), Math.max(460, height), false);
+    }
+    if (captureSettings) {
+      await mainWindow.webContents.executeJavaScript(`new Promise((resolve) => {
+        const deadline = Date.now() + 3000;
+        const openSettings = () => {
+          const button = document.querySelector('[aria-label="打开设置"]');
+          if (button instanceof HTMLElement) {
+            button.click();
+            resolve(true);
+          } else if (Date.now() < deadline) {
+            setTimeout(openSettings, 50);
+          } else {
+            resolve(false);
+          }
+        };
+        openSettings();
+      })`);
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
     const image = await mainWindow.capturePage();

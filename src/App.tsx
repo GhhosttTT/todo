@@ -15,6 +15,8 @@ import {
   RotateCcw,
   Search,
   Settings as SettingsIcon,
+  Moon,
+  Sun,
   Trash2,
   X,
 } from 'lucide-react';
@@ -51,6 +53,7 @@ function App() {
   const [shortcutDraft, setShortcutDraft] = useState('Ctrl+Alt+T');
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; kind: 'error' | 'info'; undoToken?: string } | null>(null);
+  const activeTheme = snapshot?.settings.theme;
 
   useEffect(() => {
     void window.todo.getSnapshot().then((value) => {
@@ -61,6 +64,11 @@ function App() {
     const offRuntime = window.todo.onEditModeChanged((runtime) => setSnapshot((current) => current ? { ...current, runtime } : current));
     return () => { offSnapshot(); offRuntime(); };
   }, []);
+
+  useEffect(() => {
+    if (!activeTheme) return;
+    document.documentElement.style.colorScheme = activeTheme;
+  }, [activeTheme]);
 
   useEffect(() => {
     if (!notice) return;
@@ -199,7 +207,7 @@ function App() {
 
   return (
     <div
-      className={`app-shell ${editing ? 'is-editing' : 'is-viewing'}`}
+      className={`app-shell theme-${snapshot.settings.theme} ${editing ? 'is-editing' : 'is-viewing'}`}
       style={{ '--surface-opacity': snapshot.settings.opacity, '--background-intensity': snapshot.settings.backgroundIntensity } as React.CSSProperties}
     >
       <aside className="sidebar">
@@ -234,7 +242,7 @@ function App() {
         <div className="sidebar-spacer" />
         {editing ? (
           <div className="sidebar-actions">
-            <button className={`sidebar-command ${runtimeWarning ? 'has-warning' : ''}`} onClick={() => setSettingsOpen(true)}>
+            <button aria-label="打开设置" className={`sidebar-command ${runtimeWarning ? 'has-warning' : ''}`} onClick={() => setSettingsOpen(true)}>
               {runtimeWarning ? <CircleAlert size={18} /> : <SettingsIcon size={18} />}
               <span>设置与状态</span>
             </button>
@@ -336,6 +344,18 @@ function App() {
             <div><span>SETTINGS</span><h2>设置与状态</h2></div>
             <button className="icon-button" onClick={() => setSettingsOpen(false)} title="关闭设置"><X size={20} /></button>
           </header>
+
+          <section>
+            <h3><Sun size={17} />外观主题</h3>
+            <div className="theme-segmented" aria-label="主题">
+              <button className={snapshot.settings.theme === 'light' ? 'active' : ''} onClick={() => void changeSettings({ theme: 'light' })}>
+                <Sun size={15} />白色
+              </button>
+              <button className={snapshot.settings.theme === 'dark' ? 'active' : ''} onClick={() => void changeSettings({ theme: 'dark' })}>
+                <Moon size={15} />黑色
+              </button>
+            </div>
+          </section>
 
           <section>
             <h3><Keyboard size={17} />全局快捷键</h3>

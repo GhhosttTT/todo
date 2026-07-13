@@ -127,6 +127,7 @@ interface WindowBounds {
 interface Settings {
   selectedView: ViewId;
   windowBounds: WindowBounds;
+  theme: 'light' | 'dark';
   globalShortcut: string;
   showCompleted: boolean;
   opacity: number;              // 0.72 - 1
@@ -438,7 +439,8 @@ window.todo = {
 | JSON 被手工编辑损坏 | 尝试备份；禁止静默覆盖损坏文件 |
 | 新版本数据被旧版本打开 | 只读启动，不降低 schema |
 | 快捷键被占用 | 保留应用可用性并显示冲突状态 |
-| SF Pro 单个文件缺失或损坏 | 对该字重使用 `Segoe UI Variable`, `Segoe UI`, `Microsoft YaHei UI`, sans-serif；文本不得溢出、遮挡或出现异常断行 |
+| SF Pro 拉丁字体单个文件缺失或损坏 | 对该字重使用 `Segoe UI Variable`, `Segoe UI`, sans-serif；文本不得溢出、遮挡或出现异常断行 |
+| 中文字体缺失或损坏 | 依次使用系统 `PingFang SC`、`Microsoft YaHei UI` 和 sans-serif；不得显示缺字方框或改变布局尺寸 |
 | 标题全为空格 | 不创建；编辑时恢复原值 |
 | 快速连续点击完成 | 主进程序列化 mutation，最终状态以 revision 为准 |
 | 第二实例启动 | 激活第一实例编辑模式，第二实例退出 |
@@ -459,6 +461,7 @@ window.todo = {
 - 路径：普通、`--portable`、`portable.flag`、空格/中文路径、不可写便携目录、盘符变化。
 - 窗口：WorkerW 探测成功、SetParent 后验证失败、Explorer 句柄失效和 fallback。
 - 快捷键：注册成功、冲突、替换失败时保留旧值。
+- 设置：主题默认值、白色/黑色选择持久化和旧数据缺少主题字段时的迁移默认值。
 
 ### 16.2 手工 QA
 
@@ -469,7 +472,7 @@ window.todo = {
 - 托盘进入编辑和返回桌面均可用。
 - 重启后任务、设置、视图、窗口位置保留。
 - WorkerW 失败时状态可见且 CRUD 正常。
-- 四种字体分别缺失/损坏、自定义快捷键首次冲突、只读数据目录时行为符合降级定义。
+- 四种 SF Pro 拉丁字体和中文字体分别缺失/损坏、白色/黑色主题切换、自定义快捷键首次冲突、只读数据目录时行为符合降级定义。
 
 ## 17. 第一版验收标准
 
@@ -480,9 +483,10 @@ window.todo = {
 5. 默认尝试 WorkerW；成功时查看窗口位于普通应用之后，失败时进入可观察 fallback。
 6. 快捷键或托盘可把被覆盖的查看窗口切换为可聚焦编辑窗口；退出编辑后恢复桌面层。
 7. 普通和便携路径解析可测试；便携不可写时降级到普通目录并显示状态。
-8. 四个 SF Pro 字体从 `assets/fonts` 加载，任一字体缺失或损坏时使用中文友好的 fallback，文本不溢出或遮挡。
-9. UI 不出现自定义列表、Flagged、账号、云同步或置顶设置。
-10. `npm test`、`npm run typecheck` 和 `npm run build` 通过。
+8. 四个 SF Pro 拉丁字符 WOFF2 和一个简体中文 WOFF2 子集从 `assets/fonts` 加载；系统有苹方时中文优先使用苹方，任一字体缺失或损坏时使用中文友好的系统 fallback，文本不溢出或遮挡。
+9. 白色、黑色主题均可在设置中切换并持久化；常规尺寸与最小尺寸下无文本重叠、控制溢出或不可辨识状态。
+10. UI 不出现自定义列表、Flagged、账号、云同步或置顶设置。
+11. `npm test`、`npm run typecheck` 和 `npm run build` 通过。
 
 ## 18. 实施顺序
 

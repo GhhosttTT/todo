@@ -10,17 +10,22 @@ interface IpcDependencies {
   windowController: WindowController;
   runtime: RuntimeStatus;
   registerShortcut: (accelerator: string) => { ok: boolean; error?: string };
+  transientSettings?: Partial<Settings>;
 }
 
 interface UndoEntry { task: Task; expiresAt: number }
 
 export function registerIpcHandlers(deps: IpcDependencies): void {
   const undo = new Map<string, UndoEntry>();
-  const snapshot = (): AppSnapshot => ({ ...deps.store.getSnapshot(), runtime: structuredClone(deps.runtime) });
+  const withTransientSettings = (storeSnapshot = deps.store.getSnapshot()) => ({
+    ...storeSnapshot,
+    settings: { ...storeSnapshot.settings, ...deps.transientSettings },
+  });
+  const snapshot = (): AppSnapshot => ({ ...withTransientSettings(), runtime: structuredClone(deps.runtime) });
   const broadcast = () => deps.window.webContents.send('todo:snapshot-changed', snapshot());
   const result = (storeSnapshot = deps.store.getSnapshot(), extras: Partial<MutationResult> = {}): MutationResult => ({
     ok: true,
-    snapshot: { ...storeSnapshot, runtime: structuredClone(deps.runtime) },
+    snapshot: { ...withTransientSettings(storeSnapshot), runtime: structuredClone(deps.runtime) },
     ...extras,
   });
   const mutation = async (action: () => Promise<ReturnType<TaskStore['getSnapshot']>>): Promise<MutationResult> => {

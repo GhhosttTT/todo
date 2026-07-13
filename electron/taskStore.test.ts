@@ -16,6 +16,14 @@ afterEach(() => {
 });
 
 describe('TaskStore', () => {
+  it('uses light theme by default and persists a dark theme choice', async () => {
+    const store = createStore();
+    expect(store.load().settings.theme).toBe('light');
+
+    await store.updateSettings(0, { theme: 'dark' });
+    expect(new TaskStore(store.stateFile).load().settings.theme).toBe('dark');
+  });
+
   it('persists mutations and reloads them', async () => {
     const store = createStore();
     store.load();
