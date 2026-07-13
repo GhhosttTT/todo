@@ -1,0 +1,205 @@
+import { app, BrowserWindow, globalShortcut, Menu, nativeImage, screen, Tray } from 'electron';
+import { writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { AppSnapshot, RuntimeStatus } from '../src/types';
+import { DesktopLayer } from './desktopLayer';
+import { clearIpcHandlers, registerIpcHandlers } from './ipc';
+import { resolvePathsFromEnvironment } from './runtimePaths';
+import { TaskStore } from './taskStore';
+import { WindowController } from './windowController';
+
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
+const appRoot = app.isPackaged ? dirname(process.execPath) : process.cwd();
+const defaultUserData = app.getPath('userData');
+const paths = resolvePathsFromEnvironment(appRoot, defaultUserData);
+const capturePath = process.argv.find((argument) => argument.startsWith('--todo-capture='))?.slice('--todo-capture='.length)
+  ?? process.env.TODO_CAPTURE_PATH;
+const captureSize = process.argv.find((argument) => argument.startsWith('--todo-capture-size='))?.slice('--todo-capture-size='.length);
+const captureViewMode = process.argv.includes('--todo-capture-view');
+if (paths.effectiveMode === 'portable') app.setPath('userData', paths.dataDir);
+
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) app.quit();
+
+let mainWindow: BrowserWindow | undefined;
+let tray: Tray | undefined;
+let controller: WindowController | undefined;
+let quitting = false;
+let activeShortcut: string | undefined;
+let boundsSaveTimer: NodeJS.Timeout | undefined;
+
+const store = new TaskStore(paths.stateFile);
+const runtime: RuntimeStatus = {
+  requestedDataMode: paths.requestedMode,
+  effectiveDataMode: paths.effectiveMode,
+  dataPath: paths.dataDir,
+  dataFallbackReason: paths.fallbackReason,
+  readOnly: false,
+  hasUnpersistedChanges: false,
+  shortcutActive: false,
+  desktop: { state: 'pending' },
+  windowMode: 'starting',
+};
+
+function snapshot(): AppSnapshot {
+  return { ...store.getSnapshot(), runtime: structuredClone(runtime) };
+}
+
+function broadcastSnapshot(): void {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('todo:snapshot-changed', snapshot());
+}
+
+function broadcastRuntime(): void {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('todo:runtime-changed', structuredClone(runtime));
+}
+
+function registerGlobalShortcut(accelerator: string): { ok: boolean; error?: string } {
+  const next = accelerator.trim();
+  if (!next) return { ok: false, error: '快捷键不能为空。' };
+  if (next === activeShortcut && runtime.shortcutActive) return { ok: true };
+  const registered = globalShortcut.register(next, () => { void controller?.toggleEditing(); });
+  if (!registered) {
+    runtime.shortcutActive = Boolean(activeShortcut);
+    runtime.shortcutError = `快捷键 ${next} 已被占用或无效。`;
+    broadcastRuntime();
+    return { ok: false, error: runtime.shortcutError };
+  }
+  if (activeShortcut) globalShortcut.unregister(activeShortcut);
+  activeShortcut = next;
+  runtime.shortcutActive = true;
+  runtime.shortcutError = undefined;
+  broadcastRuntime();
+  return { ok: true };
+}
+
+function createTrayIcon(): Electron.NativeImage {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#3478f6"/><circle cx="16" cy="16" r="8" fill="none" stroke="white" stroke-width="2.5"/><path d="m11.8 16 2.7 2.8 5.9-6.2" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  return nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`).resize({ width: 16, height: 16 });
+}
+
+function createTray(): void {
+  tray = new Tray(createTrayIcon());
+  tray.setToolTip('Todo 桌面插件');
+  const updateMenu = () => tray?.setContextMenu(Menu.buildFromTemplate([
+    { label: '打开编辑', click: () => { void controller?.setEditing(true); } },
+    { label: '回到桌面', click: () => { void controller?.setEditing(false); } },
+    { type: 'separator' },
+    { label: '重试桌面绑定', click: () => { void controller?.retryBinding(); } },
+    { type: 'separator' },
+    { label: '退出', click: () => { quitting = true; app.quit(); } },
+  ]));
+  updateMenu();
+  tray.on('click', () => { void controller?.toggleEditing(); });
+}
+
+async function createWindow(): Promise<void> {
+  const loaded = store.load();
+  runtime.readOnly = loaded.readOnly;
+  runtime.persistenceError = loaded.recoveryMessage;
+
+  const desktopLayer = new DesktopLayer();
+  try {
+    await desktopLayer.initialize();
+  } catch (error) {
+    runtime.desktop = { state: 'fallback', stage: 'initialize', message: error instanceof Error ? error.message : 'Win32 初始化失败。' };
+  }
+
+  mainWindow = new BrowserWindow({
+    ...loaded.settings.windowBounds,
+    minWidth: 680,
+    minHeight: 460,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    roundedCorners: true,
+    skipTaskbar: true,
+    show: false,
+    hasShadow: true,
+    webPreferences: {
+      preload: join(currentDirectory, '../preload/preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  mainWindow.setOpacity(loaded.settings.opacity);
+  controller = new WindowController(mainWindow, desktopLayer, runtime, broadcastRuntime);
+  mainWindow.setBounds(controller.safeBounds(loaded.settings.windowBounds));
+
+  registerIpcHandlers({ store, window: mainWindow, windowController: controller, runtime, registerShortcut: registerGlobalShortcut });
+  registerGlobalShortcut(loaded.settings.globalShortcut);
+  createTray();
+
+  mainWindow.on('close', (event) => {
+    if (!quitting) {
+      event.preventDefault();
+      void controller?.setEditing(false);
+    }
+  });
+
+  const scheduleBoundsSave = () => {
+    if (!controller || !mainWindow || runtime.windowMode !== 'editing') return;
+    if (boundsSaveTimer) clearTimeout(boundsSaveTimer);
+    boundsSaveTimer = setTimeout(async () => {
+      if (!controller) return;
+      try {
+        const current = store.getSnapshot();
+        await store.updateSettings(current.revision, { windowBounds: controller.currentBounds() });
+        broadcastSnapshot();
+      } catch (error) {
+        runtime.persistenceError = error instanceof Error ? error.message : '窗口位置保存失败。';
+        runtime.hasUnpersistedChanges = true;
+        broadcastRuntime();
+      }
+    }, 500);
+  };
+  mainWindow.on('move', scheduleBoundsSave);
+  mainWindow.on('resize', scheduleBoundsSave);
+
+  if (process.env.ELECTRON_RENDERER_URL) await mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
+  else await mainWindow.loadFile(join(currentDirectory, '../renderer/index.html'));
+  await controller.startViewing();
+  if (!app.isPackaged && capturePath) {
+    if (!captureViewMode) await controller.setEditing(true);
+    if (captureSize && /^\d+x\d+$/.test(captureSize)) {
+      const [width, height] = captureSize.split('x').map(Number);
+      const bounds = mainWindow.getBounds();
+      mainWindow.setBounds({ ...bounds, width: Math.max(680, width), height: Math.max(460, height) }, false);
+      mainWindow.setContentSize(Math.max(680, width), Math.max(460, height), false);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const image = await mainWindow.capturePage();
+    writeFileSync(capturePath, image.toPNG());
+  }
+}
+
+if (hasSingleInstanceLock) {
+  app.whenReady().then(async () => {
+    const lockAcquired = store.acquireLock();
+    if (!lockAcquired) {
+      store.forceReadOnly('数据文件正在被另一个进程使用。');
+      runtime.readOnly = true;
+      runtime.persistenceError = store.getRecoveryMessage();
+    }
+    await createWindow();
+
+    app.on('second-instance', () => { void controller?.setEditing(true); });
+    screen.on('display-added', () => { if (runtime.windowMode !== 'editing') void controller?.startViewing(); });
+    screen.on('display-removed', () => { if (runtime.windowMode !== 'editing') void controller?.startViewing(); });
+    screen.on('display-metrics-changed', () => { if (runtime.windowMode !== 'editing') void controller?.startViewing(); });
+  }).catch((error) => {
+    console.error(error);
+    app.quit();
+  });
+}
+
+app.on('before-quit', () => { quitting = true; });
+app.on('will-quit', () => {
+  if (boundsSaveTimer) clearTimeout(boundsSaveTimer);
+  globalShortcut.unregisterAll();
+  clearIpcHandlers();
+  store.releaseLock();
+  tray?.destroy();
+});
+app.on('window-all-closed', () => { /* Tray application remains active. */ });

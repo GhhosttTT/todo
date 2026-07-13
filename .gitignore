@@ -1,0 +1,9 @@
+node_modules/
+out/
+dist/
+coverage/
+portable-data/
+portable.flag
+bootstrap.json
+*.log
+.DS_Store
