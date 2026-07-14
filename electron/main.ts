@@ -86,8 +86,20 @@ function fallbackIconSvg(): string {
 }
 
 function loadIcon(size = 16): Electron.NativeImage {
-  const iconPath = join(paths.assetRoot, 'icons', 'todo-tray.svg');
-  const svg = existsSync(iconPath) ? readFileSync(iconPath, 'utf8') : fallbackIconSvg();
+  const icoPath = join(paths.assetRoot, 'icons', 'todo-tray.ico');
+  if (process.platform === 'win32' && existsSync(icoPath)) {
+    const image = nativeImage.createFromPath(icoPath);
+    if (!image.isEmpty()) return image.resize({ width: size, height: size });
+  }
+
+  const pngPath = join(paths.assetRoot, 'icons', `todo-tray-${size >= 48 ? 64 : 32}.png`);
+  if (existsSync(pngPath)) {
+    const image = nativeImage.createFromPath(pngPath);
+    if (!image.isEmpty()) return image.resize({ width: size, height: size });
+  }
+
+  const svgPath = join(paths.assetRoot, 'icons', 'todo-tray.svg');
+  const svg = existsSync(svgPath) ? readFileSync(svgPath, 'utf8') : fallbackIconSvg();
   return nativeImage
     .createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`)
     .resize({ width: size, height: size });
