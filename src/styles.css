@@ -243,8 +243,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   position: relative;
   z-index: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--pane-surface);
 }
 
@@ -283,7 +285,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .icon-button.compact { width: 23px; height: 23px; }
 .add-button { width: 42px; height: 42px; margin-bottom: 3px; color: var(--blue); }
 
-.task-scroll { min-height: 0; flex: 1; overflow: auto; padding: 0 42px 34px; scrollbar-width: thin; scrollbar-color: rgba(95, 101, 112, .24) transparent; }
+.task-scroll { min-height: 0; flex: 1; overflow: auto; overscroll-behavior: contain; padding: 0 42px 34px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(95, 101, 112, .24) transparent; }
 .task-list { border-top: 1px solid var(--line); }
 
 .task-row, .composer {
