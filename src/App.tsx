@@ -273,10 +273,8 @@ function App() {
           </div>
         ) : (
           <div className="shortcut-hint" aria-label={`按 ${snapshot.settings.globalShortcut} 进入编辑模式`}>
-            <Keyboard size={15} />
-            <span>按</span>
+            <Keyboard size={13} />
             <kbd>{snapshot.settings.globalShortcut}</kbd>
-            <span>编辑</span>
           </div>
         )}
       </aside>
