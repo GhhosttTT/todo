@@ -21,6 +21,18 @@ describe('TaskStore', () => {
     expect(store.load().settings.selectedView).toBe('all');
   });
 
+  it('keeps the widget height fixed when loading saved bounds', () => {
+    const store = createStore();
+    writeFileSync(store.stateFile, JSON.stringify({
+      schemaVersion: 2,
+      revision: 1,
+      tasks: [],
+      settings: { windowBounds: { x: 10, y: 20, width: 760, height: 1200 } },
+    }), 'utf8');
+
+    expect(store.load().settings.windowBounds).toMatchObject({ width: 760, height: 620 });
+  });
+
   it('uses light theme by default and persists a dark theme choice', async () => {
     const store = createStore();
     expect(store.load().settings.theme).toBe('light');

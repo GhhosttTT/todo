@@ -2,6 +2,8 @@ import { app, BrowserWindow, screen } from 'electron';
 import type { DesktopBindingStatus, RuntimeStatus, WindowBounds, WindowMode } from '../src/types';
 import { DesktopLayer } from './desktopLayer';
 
+export const FIXED_WINDOW_HEIGHT = 620;
+
 export class WindowController {
   private mode: WindowMode = 'starting';
   private generation = 0;
@@ -46,7 +48,7 @@ export class WindowController {
     const target = preferred ?? screen.getDisplayMatching(bounds);
     const area = target.workArea;
     const width = Math.min(Math.max(bounds.width, 680), area.width);
-    const height = Math.min(Math.max(bounds.height, 460), area.height);
+    const height = Math.min(FIXED_WINDOW_HEIGHT, area.height);
     return {
       x: Math.min(Math.max(bounds.x, area.x), area.x + area.width - width),
       y: Math.min(Math.max(bounds.y, area.y), area.y + area.height - height),

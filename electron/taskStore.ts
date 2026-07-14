@@ -15,6 +15,7 @@ import { applyVisibleOrder, isValidDateKey } from '../src/domain/tasks';
 import type { Settings, Task, ViewId } from '../src/types';
 
 const SCHEMA_VERSION = 2;
+const FIXED_WINDOW_HEIGHT = 620;
 const require = createRequire(import.meta.url);
 type ReplaceFileApi = (replaced: string, replacement: string, backup: string, flags: number, exclude: null, reserved: null) => boolean;
 let replaceFileApi: ReplaceFileApi | undefined;
@@ -135,7 +136,7 @@ function parseSettings(value: unknown): Settings {
       x: finiteNumber(bounds.x, defaults.windowBounds.x),
       y: finiteNumber(bounds.y, defaults.windowBounds.y),
       width: Math.max(680, finiteNumber(bounds.width, defaults.windowBounds.width)),
-      height: Math.max(460, finiteNumber(bounds.height, defaults.windowBounds.height)),
+      height: FIXED_WINDOW_HEIGHT,
       displayId: typeof bounds.displayId === 'string' ? bounds.displayId : undefined,
       scaleFactor: finiteNumber(bounds.scaleFactor, 1),
     },

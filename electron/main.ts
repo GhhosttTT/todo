@@ -8,7 +8,7 @@ import { clearIpcHandlers, registerIpcHandlers } from './ipc';
 import { ReminderScheduler } from './reminderScheduler';
 import { resolvePathsFromEnvironment } from './runtimePaths';
 import { TaskStore } from './taskStore';
-import { WindowController } from './windowController';
+import { FIXED_WINDOW_HEIGHT, WindowController } from './windowController';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const appRoot = app.isPackaged ? dirname(process.execPath) : process.cwd();
@@ -139,7 +139,9 @@ async function createWindow(): Promise<void> {
   mainWindow = new BrowserWindow({
     ...loaded.settings.windowBounds,
     minWidth: 680,
-    minHeight: 460,
+    height: FIXED_WINDOW_HEIGHT,
+    minHeight: FIXED_WINDOW_HEIGHT,
+    maxHeight: FIXED_WINDOW_HEIGHT,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
@@ -205,10 +207,10 @@ async function createWindow(): Promise<void> {
   if (!app.isPackaged && capturePath) {
     if (!captureViewMode) await controller.setEditing(true);
     if (captureSize && /^\d+x\d+$/.test(captureSize)) {
-      const [width, height] = captureSize.split('x').map(Number);
+      const [width] = captureSize.split('x').map(Number);
       const bounds = mainWindow.getBounds();
-      mainWindow.setBounds({ ...bounds, width: Math.max(680, width), height: Math.max(460, height) }, false);
-      mainWindow.setContentSize(Math.max(680, width), Math.max(460, height), false);
+      mainWindow.setBounds({ ...bounds, width: Math.max(680, width), height: FIXED_WINDOW_HEIGHT }, false);
+      mainWindow.setContentSize(Math.max(680, width), FIXED_WINDOW_HEIGHT, false);
     }
     if (captureSettings) {
       await mainWindow.webContents.executeJavaScript(`new Promise((resolve) => {

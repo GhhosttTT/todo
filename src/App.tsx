@@ -101,7 +101,7 @@ function App() {
   }, []);
 
   const editing = snapshot?.runtime.windowMode === 'editing';
-  const view = snapshot?.settings.selectedView ?? 'today';
+  const view = snapshot?.settings.selectedView ?? 'all';
   const counts = useMemo(() => getViewCounts(snapshot?.tasks ?? []), [snapshot?.tasks]);
   const visibleTasks = useMemo(() => snapshot ? filterTasks(snapshot.tasks, {
     view,
@@ -216,7 +216,7 @@ function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   });
 
-  if (!snapshot) return <div className="boot-state">正在打开 Today...</div>;
+  if (!snapshot) return <div className="boot-state">正在打开 Todo...</div>;
 
   const meta = viewMeta[view];
   const Icon = meta.icon;
@@ -271,7 +271,14 @@ function App() {
               <span>完成编辑</span>
             </button>
           </div>
-        ) : null}
+        ) : (
+          <div className="shortcut-hint" aria-label={`按 ${snapshot.settings.globalShortcut} 进入编辑模式`}>
+            <Keyboard size={15} />
+            <span>按</span>
+            <kbd>{snapshot.settings.globalShortcut}</kbd>
+            <span>编辑</span>
+          </div>
+        )}
       </aside>
 
       <main className="task-pane">
