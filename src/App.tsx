@@ -231,10 +231,7 @@ function App() {
       style={{ '--surface-opacity': snapshot.settings.opacity, '--background-intensity': snapshot.settings.backgroundIntensity } as React.CSSProperties}
     >
       <aside className="sidebar">
-        <div className="drag-strip">
-          <span className="app-mark" aria-hidden="true" />
-          <span className="mode-label">{editing ? 'EDITING' : 'DESKTOP'}</span>
-        </div>
+        <div className="drag-strip" aria-hidden="true" />
 
         {editing && (
           <label className="search-box">
