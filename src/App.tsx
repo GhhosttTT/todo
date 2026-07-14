@@ -11,7 +11,6 @@ import {
   Keyboard,
   Layers3,
   MonitorDown,
-  Pencil,
   Plus,
   RotateCcw,
   Search,
@@ -272,12 +271,7 @@ function App() {
               <span>完成编辑</span>
             </button>
           </div>
-        ) : (
-          <button className="edit-entry" onClick={() => void window.todo.setEditMode(true)} title="进入编辑模式">
-            <Pencil size={17} />
-            <span>编辑</span>
-          </button>
-        )}
+        ) : null}
       </aside>
 
       <main className="task-pane">

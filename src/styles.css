@@ -178,7 +178,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 
 .sidebar-spacer { flex: 1; }
 .sidebar-actions { display: grid; gap: 7px; }
-.sidebar-command, .edit-entry {
+.sidebar-command {
   min-height: 39px;
   display: flex;
   align-items: center;
@@ -191,11 +191,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   -webkit-app-region: no-drag;
 }
 .sidebar-command { padding: 0 10px; }
-.sidebar-command:hover, .edit-entry:hover { background: rgba(255, 255, 255, .54); }
+.sidebar-command:hover { background: rgba(255, 255, 255, .54); }
 .sidebar-command.primary { justify-content: center; color: white; background: var(--strong-control); }
 .sidebar-command.primary:hover { background: var(--strong-control-hover); }
 .sidebar-command.has-warning { color: #a84a2e; }
-.edit-entry { align-self: flex-start; padding: 0 7px; color: #565d67; }
 
 .task-pane {
   position: relative;
@@ -413,10 +412,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .theme-dark .view-tile small { color: #878e98; }
 .theme-dark .view-tile.active small { color: rgba(255, 255, 255, .72); }
 .theme-dark .view-tile.active.graphite { background: #656e7a; }
-.theme-dark .sidebar-command:hover, .theme-dark .edit-entry:hover { background: rgba(255, 255, 255, .065); }
+.theme-dark .sidebar-command:hover { background: rgba(255, 255, 255, .065); }
 .theme-dark .sidebar-command.primary { color: #171a1e; }
 .theme-dark .sidebar-command.has-warning { color: #ff9272; }
-.theme-dark .edit-entry { color: #c5cad1; }
 .theme-dark .pane-header p { color: #737a84; }
 .theme-dark .icon-button { color: #a4aab3; }
 .theme-dark .icon-button:hover { color: #f1f3f5; background: rgba(255, 255, 255, .07); }
