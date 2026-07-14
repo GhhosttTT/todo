@@ -207,7 +207,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .sidebar-command.has-warning { color: #a84a2e; }
 .shortcut-hint {
   position: absolute;
-  bottom: 14px;
+  bottom: 44px;
   left: 16px;
   width: max-content;
   max-width: calc(100% - 30px);
