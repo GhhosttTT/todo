@@ -1,5 +1,5 @@
 import { app, BrowserWindow, globalShortcut, Menu, nativeImage, screen, Tray } from 'electron';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AppSnapshot, RuntimeStatus } from '../src/types';
@@ -81,9 +81,20 @@ function registerGlobalShortcut(accelerator: string): { ok: boolean; error?: str
   return { ok: true };
 }
 
+function fallbackIconSvg(): string {
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect x="6" y="6" width="52" height="52" rx="14" fill="#3478f6"/><rect x="17" y="17" width="30" height="7" rx="3.5" fill="#fff"/><rect x="28.5" y="17" width="7" height="29" rx="3.5" fill="#fff"/><circle cx="45" cy="45" r="11" fill="#fff"/><path d="M39.8 45.2 43.2 48.6 50.6 40.7" fill="none" stroke="#3478f6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+
+function loadIcon(size = 16): Electron.NativeImage {
+  const iconPath = join(paths.assetRoot, 'icons', 'todo-tray.svg');
+  const svg = existsSync(iconPath) ? readFileSync(iconPath, 'utf8') : fallbackIconSvg();
+  return nativeImage
+    .createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`)
+    .resize({ width: size, height: size });
+}
+
 function createTrayIcon(): Electron.NativeImage {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#3478f6"/><circle cx="16" cy="16" r="8" fill="none" stroke="white" stroke-width="2.5"/><path d="m11.8 16 2.7 2.8 5.9-6.2" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  return nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`).resize({ width: 16, height: 16 });
+  return loadIcon(16);
 }
 
 function createTray(): void {
@@ -124,6 +135,7 @@ async function createWindow(): Promise<void> {
     skipTaskbar: true,
     show: false,
     hasShadow: true,
+    icon: loadIcon(64),
     webPreferences: {
       preload: join(currentDirectory, '../preload/preload.cjs'),
       contextIsolation: true,
@@ -133,7 +145,7 @@ async function createWindow(): Promise<void> {
   });
   mainWindow.setOpacity(loaded.settings.opacity);
   controller = new WindowController(mainWindow, desktopLayer, runtime, broadcastRuntime);
-  reminders = new ReminderScheduler(store, broadcastSnapshot, () => { void controller?.setEditing(true); });
+  reminders = new ReminderScheduler(store, broadcastSnapshot, () => { void controller?.setEditing(true); }, loadIcon(64));
   mainWindow.setBounds(controller.safeBounds(loaded.settings.windowBounds));
 
   registerIpcHandlers({

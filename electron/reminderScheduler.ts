@@ -1,4 +1,4 @@
-import { Notification } from 'electron';
+import { Notification, nativeImage } from 'electron';
 import type { Task } from '../src/types';
 import type { TaskStore } from './taskStore';
 
@@ -15,6 +15,7 @@ export class ReminderScheduler {
     private readonly store: TaskStore,
     private readonly onChanged: () => void,
     private readonly onOpenTask: () => void,
+    private readonly icon: Electron.NativeImage = nativeImage.createEmpty(),
   ) {}
 
   scheduleAll(): void {
@@ -52,6 +53,7 @@ export class ReminderScheduler {
     const notification = new Notification({
       title: 'Todo 提醒',
       body: task.notes ? `${task.title}\n${task.notes.slice(0, 120)}` : task.title,
+      icon: this.icon,
       silent: false,
     });
     notification.on('click', this.onOpenTask);
