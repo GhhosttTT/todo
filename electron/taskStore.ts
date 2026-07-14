@@ -69,7 +69,7 @@ export class ReadOnlyStoreError extends Error {
 
 export function createDefaultSettings(): Settings {
   return {
-    selectedView: 'today',
+    selectedView: 'all',
     windowBounds: { x: 120, y: 100, width: 900, height: 620 },
     theme: 'light',
     globalShortcut: 'Ctrl+Alt+T',

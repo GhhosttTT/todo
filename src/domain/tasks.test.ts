@@ -44,6 +44,11 @@ describe('fixed task views', () => {
     expect(getViewCounts(tasks, '2026-07-13')).toEqual({ today: 2, scheduled: 1, all: 5 });
   });
 
+  it('prioritizes overdue and today tasks at the top of All', () => {
+    expect(filterTasks(tasks, { view: 'all', showCompleted: false, today: '2026-07-13' }).map(({ id }) => id))
+      .toEqual(['today', 'overdue', 'future', 'none', 'notes']);
+  });
+
   it('searches title and notes inside the current view', () => {
     expect(filterTasks(tasks, { view: 'all', showCompleted: false, query: 'needle', today: '2026-07-13' }).map(({ id }) => id)).toEqual(['notes']);
     expect(filterTasks(tasks, { view: 'scheduled', showCompleted: false, query: 'overdue', today: '2026-07-13' })).toHaveLength(0);

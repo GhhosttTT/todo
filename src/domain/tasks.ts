@@ -26,6 +26,20 @@ export function compareTasks(a: Task, b: Task): number {
   return a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
 }
 
+function allViewDateRank(task: Task, today: string): number {
+  if (!task.dueDate) return 2;
+  return task.dueDate <= today ? 0 : 1;
+}
+
+function compareTasksForView(a: Task, b: Task, view: ViewId, today: string): number {
+  if (view === 'all') {
+    if (Boolean(a.completedAt) !== Boolean(b.completedAt)) return a.completedAt ? 1 : -1;
+    const rankDelta = allViewDateRank(a, today) - allViewDateRank(b, today);
+    if (rankDelta !== 0) return rankDelta;
+  }
+  return compareTasks(a, b);
+}
+
 export function filterTasks(
   tasks: Task[],
   options: { view: ViewId; showCompleted: boolean; query?: string; today?: string },
@@ -40,7 +54,7 @@ export function filterTasks(
       if (!query) return true;
       return task.title.toLocaleLowerCase().includes(query) || task.notes.toLocaleLowerCase().includes(query);
     })
-    .sort(compareTasks);
+    .sort((a, b) => compareTasksForView(a, b, options.view, today));
 }
 
 export function getViewCounts(tasks: Task[], today = localDateKey()): Record<ViewId, number> {

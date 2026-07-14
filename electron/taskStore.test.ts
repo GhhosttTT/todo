@@ -16,6 +16,11 @@ afterEach(() => {
 });
 
 describe('TaskStore', () => {
+  it('defaults to the All view', () => {
+    const store = createStore();
+    expect(store.load().settings.selectedView).toBe('all');
+  });
+
   it('uses light theme by default and persists a dark theme choice', async () => {
     const store = createStore();
     expect(store.load().settings.theme).toBe('light');
