@@ -15,6 +15,17 @@ describe('resolveRuntimePaths', () => {
     expect(paths.dataDir.startsWith(paths.appRoot)).toBe(true);
   });
 
+  it('can resolve packaged assets outside the executable directory', () => {
+    const paths = resolveRuntimePaths({
+      appRoot: 'C:\\Todo',
+      assetRoot: 'C:\\Todo\\resources\\assets',
+      userDataDir: 'C:\\Users\\A\\AppData\\Todo',
+      argv: [],
+      writable: () => true,
+    });
+    expect(paths.assetRoot).toBe('C:\\Todo\\resources\\assets');
+  });
+
   it('falls back when the portable directory is not writable', () => {
     const paths = resolveRuntimePaths({ appRoot: 'E:\\Todo', userDataDir: 'C:\\Data', argv: [], portableFlagExists: true, writable: () => false });
     expect(paths.requestedMode).toBe('portable');

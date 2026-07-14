@@ -12,8 +12,9 @@ import { FIXED_WINDOW_HEIGHT, WindowController } from './windowController';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const appRoot = app.isPackaged ? dirname(process.execPath) : process.cwd();
+const assetRoot = app.isPackaged ? join(process.resourcesPath, 'assets') : join(appRoot, 'assets');
 const defaultUserData = app.getPath('userData');
-const paths = resolvePathsFromEnvironment(appRoot, defaultUserData);
+const paths = resolvePathsFromEnvironment(appRoot, defaultUserData, process.argv, assetRoot);
 if (process.platform === 'win32') app.setAppUserModelId('com.ghhostttt.todo');
 const capturePath = process.argv.find((argument) => argument.startsWith('--todo-capture='))?.slice('--todo-capture='.length)
   ?? process.env.TODO_CAPTURE_PATH;

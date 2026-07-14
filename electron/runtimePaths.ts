@@ -15,6 +15,7 @@ export interface RuntimePaths {
 
 export interface ResolvePathOptions {
   appRoot: string;
+  assetRoot?: string;
   userDataDir: string;
   argv: string[];
   portableFlagExists?: boolean;
@@ -61,7 +62,7 @@ export function resolveRuntimePaths(options: ResolvePathOptions): RuntimePaths {
 
   return {
     appRoot,
-    assetRoot: join(appRoot, 'assets'),
+    assetRoot: options.assetRoot ? resolve(options.assetRoot) : join(appRoot, 'assets'),
     requestedMode,
     effectiveMode,
     dataDir,
@@ -71,9 +72,10 @@ export function resolveRuntimePaths(options: ResolvePathOptions): RuntimePaths {
   };
 }
 
-export function resolvePathsFromEnvironment(appRoot: string, userDataDir: string, argv = process.argv): RuntimePaths {
+export function resolvePathsFromEnvironment(appRoot: string, userDataDir: string, argv = process.argv, assetRoot?: string): RuntimePaths {
   return resolveRuntimePaths({
     appRoot,
+    assetRoot,
     userDataDir,
     argv,
     portableFlagExists: existsSync(join(appRoot, 'portable.flag')),
