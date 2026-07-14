@@ -109,6 +109,14 @@ function App() {
     query,
   }) : [], [query, snapshot, view]);
 
+  useEffect(() => {
+    if (editing) return;
+    setSettingsOpen(false);
+    setComposerOpen(false);
+    setEditingId(null);
+    setDraggedId(null);
+  }, [editing]);
+
   const selectView = async (nextView: ViewId) => {
     if (!snapshot || nextView === view) return;
     const result = await window.todo.updateSettings({ settings: { selectedView: nextView }, baseRevision: snapshot.revision });
