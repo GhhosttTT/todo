@@ -60,8 +60,15 @@ function formatReminder(value: string): string {
   return Number.isFinite(date.getTime()) ? format(date, 'yyyy-MM-dd HH:mm') : value;
 }
 
+function millisecondsUntilNextLocalDay(): number {
+  const now = new Date();
+  const nextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 2);
+  return Math.max(1000, nextDay.getTime() - now.getTime());
+}
+
 function App() {
   const [snapshot, setSnapshot] = useState<AppSnapshot | null>(null);
+  const [todayKey, setTodayKey] = useState(localDateKey());
   const [query, setQuery] = useState('');
   const [composerOpen, setComposerOpen] = useState(false);
   const [composer, setComposer] = useState<DraftTask>({ title: '', notes: '', dueDate: '', remindAt: '' });
@@ -89,6 +96,23 @@ function App() {
   }, [activeTheme]);
 
   useEffect(() => {
+    const refreshToday = () => setTodayKey(localDateKey());
+    const timer = window.setTimeout(refreshToday, millisecondsUntilNextLocalDay());
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshToday();
+    };
+    const onFocus = () => refreshToday();
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [todayKey]);
+
+  useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(null), notice.undoToken ? 8000 : 4200);
     return () => window.clearTimeout(timer);
@@ -102,12 +126,13 @@ function App() {
 
   const editing = snapshot?.runtime.windowMode === 'editing';
   const view = snapshot?.settings.selectedView ?? 'all';
-  const counts = useMemo(() => getViewCounts(snapshot?.tasks ?? []), [snapshot?.tasks]);
+  const counts = useMemo(() => getViewCounts(snapshot?.tasks ?? [], todayKey), [snapshot?.tasks, todayKey]);
   const visibleTasks = useMemo(() => snapshot ? filterTasks(snapshot.tasks, {
     view,
     showCompleted: snapshot.settings.showCompleted,
     query,
-  }) : [], [query, snapshot, view]);
+    today: todayKey,
+  }) : [], [query, snapshot, todayKey, view]);
 
   useEffect(() => {
     if (editing) return;
@@ -352,7 +377,7 @@ function App() {
                       <span className="task-title">{task.title}</span>
                       {(task.notes || task.dueDate || task.remindAt) && (
                         <span className="task-meta">
-                          {task.dueDate && <span className={task.dueDate < localDateKey() && !task.completedAt ? 'overdue' : ''}><CalendarDays size={13} />{task.dueDate}</span>}
+                          {task.dueDate && <span className={task.dueDate < todayKey && !task.completedAt ? 'overdue' : ''}><CalendarDays size={13} />{task.dueDate}</span>}
                           {task.remindAt && <span><Clock3 size={13} />{formatReminder(task.remindAt)}</span>}
                           {task.notes && <span>{task.notes}</span>}
                         </span>
