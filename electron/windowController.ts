@@ -3,6 +3,7 @@ import type { DesktopBindingStatus, RuntimeStatus, WindowBounds, WindowMode } fr
 import { DesktopLayer } from './desktopLayer';
 
 export const FIXED_WINDOW_HEIGHT = 620;
+const FOCUS_BOOST_DURATION_MS = 900;
 
 export class WindowController {
   private mode: WindowMode = 'starting';
@@ -79,16 +80,22 @@ export class WindowController {
     this.window.setFocusable(true);
     this.window.setIgnoreMouseEvents(false);
     if (this.window.isMinimized()) this.window.restore();
-    this.window.show();
-    app.focus({ steal: true });
+    this.window.setAlwaysOnTop(true, 'pop-up-menu');
+    this.window.showInactive();
     this.window.moveTop();
+    this.window.show();
     this.window.focus();
+    app.focus({ steal: true });
+    setTimeout(() => {
+      if (!this.window.isDestroyed() && this.mode === 'editing') this.window.setAlwaysOnTop(false);
+    }, FOCUS_BOOST_DURATION_MS);
     this.setMode('editing');
   }
 
   private async exitEditing(generation: number): Promise<void> {
     if (this.mode !== 'editing' && this.mode !== 'entering-editing') return;
     this.setMode('exiting-editing');
+    this.window.setAlwaysOnTop(false);
     this.setMode('rebinding');
     await this.bindForView(generation);
   }
