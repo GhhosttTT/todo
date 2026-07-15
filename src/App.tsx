@@ -124,7 +124,7 @@ function App() {
     return result.ok;
   }, []);
 
-  const editing = snapshot?.runtime.windowMode === 'editing';
+  const editing = snapshot?.runtime.windowMode === 'editing' || snapshot?.runtime.windowMode === 'entering-editing';
   const view = snapshot?.settings.selectedView ?? 'all';
   const counts = useMemo(() => getViewCounts(snapshot?.tasks ?? [], todayKey), [snapshot?.tasks, todayKey]);
   const visibleTasks = useMemo(() => snapshot ? filterTasks(snapshot.tasks, {

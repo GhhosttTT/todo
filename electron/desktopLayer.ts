@@ -66,7 +66,7 @@ export class DesktopLayer {
     try {
       const api = this.requireApi();
       const hwnd = api.koffi.decode(window.getNativeWindowHandle(), api.HWND);
-      const workerW = this.findWorkerW(api);
+      const workerW = this.workerW && api.IsWindow(this.workerW) ? this.workerW : this.findWorkerW(api);
       if (!workerW) return { state: 'fallback', stage: 'find-workerw', message: '未找到可验证的 WorkerW 桌面层。' };
       if (!api.IsWindow(hwnd) || !api.IsWindow(workerW)) return { state: 'fallback', stage: 'validate-handles', message: '桌面窗口句柄已失效。' };
 
