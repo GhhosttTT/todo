@@ -35,6 +35,7 @@ let reminders: ReminderScheduler | undefined;
 let quitting = false;
 let activeShortcut: string | undefined;
 let boundsSaveTimer: NodeJS.Timeout | undefined;
+let updateTrayMenu: (() => void) | undefined;
 
 const store = new TaskStore(paths.stateFile);
 const runtime: RuntimeStatus = {
@@ -60,7 +61,17 @@ function broadcastSnapshot(): void {
 }
 
 function broadcastRuntime(): void {
+  updateTrayMenu?.();
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('todo:runtime-changed', structuredClone(runtime));
+}
+
+function applyLaunchAtLogin(enabled: boolean): void {
+  if (process.platform !== 'win32') return;
+  app.setLoginItemSettings({
+    openAtLogin: enabled,
+    path: process.execPath,
+    args: [],
+  });
 }
 
 function registerGlobalShortcut(accelerator: string): { ok: boolean; error?: string } {
@@ -113,15 +124,20 @@ function createTrayIcon(): Electron.NativeImage {
 function createTray(): void {
   tray = new Tray(createTrayIcon());
   tray.setToolTip('Todo 桌面插件');
-  const updateMenu = () => tray?.setContextMenu(Menu.buildFromTemplate([
-    { label: '打开编辑', click: () => { void controller?.setEditing(true); } },
-    { label: '回到桌面', click: () => { void controller?.setEditing(false); } },
+  updateTrayMenu = () => {
+    const editing = runtime.windowMode === 'editing' || runtime.windowMode === 'entering-editing';
+    const modeAction = editing
+      ? { label: '回到桌面', click: () => { void controller?.setEditing(false); } }
+      : { label: '打开编辑', click: () => { void controller?.setEditing(true); } };
+    tray?.setContextMenu(Menu.buildFromTemplate([
+    modeAction,
     { type: 'separator' },
     { label: '重试桌面绑定', click: () => { void controller?.retryBinding(); } },
     { type: 'separator' },
     { label: '退出', click: () => { quitting = true; app.quit(); } },
   ]));
-  updateMenu();
+  };
+  updateTrayMenu();
   tray.on('click', () => { void controller?.toggleEditing(); });
 }
 
@@ -129,6 +145,7 @@ async function createWindow(): Promise<void> {
   const loaded = store.load();
   runtime.readOnly = loaded.readOnly;
   runtime.persistenceError = loaded.recoveryMessage;
+  applyLaunchAtLogin(loaded.settings.launchAtLogin);
 
   const desktopLayer = new DesktopLayer();
   try {
@@ -169,6 +186,7 @@ async function createWindow(): Promise<void> {
     windowController: controller,
     runtime,
     registerShortcut: registerGlobalShortcut,
+    applyLaunchAtLogin,
     onStoreChanged: () => reminders?.scheduleAll(),
     transientSettings: captureTheme ? { theme: captureTheme } : undefined,
   });

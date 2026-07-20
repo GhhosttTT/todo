@@ -434,6 +434,10 @@ function App() {
 
           <section className="toggles">
             <label className="toggle-row">
+              <span><strong>开机自启</strong><small>Windows 登录后自动启动 Todo</small></span>
+              <input type="checkbox" checked={snapshot.settings.launchAtLogin} onChange={(event) => void changeSettings({ launchAtLogin: event.target.checked })} />
+            </label>
+            <label className="toggle-row">
               <span><strong>显示已完成</strong><small>在当前视图中保留完成项</small></span>
               <input type="checkbox" checked={snapshot.settings.showCompleted} onChange={(event) => void changeSettings({ showCompleted: event.target.checked })} />
             </label>

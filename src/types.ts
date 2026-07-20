@@ -30,6 +30,7 @@ export interface Settings {
   windowBounds: WindowBounds;
   theme: Theme;
   globalShortcut: string;
+  launchAtLogin: boolean;
   showCompleted: boolean;
   opacity: number;
   backgroundIntensity: number;
@@ -96,7 +97,7 @@ export interface TodoApi {
   deleteTask(input: { id: string; baseRevision: number }): Promise<MutationResult>;
   restoreDeletedTask(input: { token: string; baseRevision: number }): Promise<MutationResult>;
   reorderTasks(input: { ids: string[]; baseRevision: number }): Promise<MutationResult>;
-  updateSettings(input: { settings: Partial<Pick<Settings, 'selectedView' | 'theme' | 'globalShortcut' | 'showCompleted' | 'opacity' | 'backgroundIntensity'>>; baseRevision: number }): Promise<MutationResult>;
+  updateSettings(input: { settings: Partial<Pick<Settings, 'selectedView' | 'theme' | 'globalShortcut' | 'launchAtLogin' | 'showCompleted' | 'opacity' | 'backgroundIntensity'>>; baseRevision: number }): Promise<MutationResult>;
   setEditMode(editing: boolean): Promise<RuntimeStatus>;
   retryDesktopBinding(): Promise<DesktopBindingStatus>;
   onSnapshotChanged(callback: (snapshot: AppSnapshot) => void): () => void;

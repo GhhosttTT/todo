@@ -10,6 +10,7 @@ interface IpcDependencies {
   windowController: WindowController;
   runtime: RuntimeStatus;
   registerShortcut: (accelerator: string) => { ok: boolean; error?: string };
+  applyLaunchAtLogin: (enabled: boolean) => void;
   onStoreChanged?: () => void;
   transientSettings?: Partial<Settings>;
 }
@@ -81,6 +82,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     }
     const changed = await mutation(() => deps.store.updateSettings(input.baseRevision, settings));
     if (changed.ok && settings.opacity !== undefined) deps.window.setOpacity(Math.min(1, Math.max(0.72, settings.opacity)));
+    if (changed.ok && settings.launchAtLogin !== undefined) deps.applyLaunchAtLogin(settings.launchAtLogin);
     if (!changed.ok && settings.globalShortcut !== undefined && settings.globalShortcut !== oldShortcut) deps.registerShortcut(oldShortcut);
     return changed;
   });
