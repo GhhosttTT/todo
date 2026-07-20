@@ -98,6 +98,7 @@ export interface TodoApi {
   restoreDeletedTask(input: { token: string; baseRevision: number }): Promise<MutationResult>;
   reorderTasks(input: { ids: string[]; baseRevision: number }): Promise<MutationResult>;
   updateSettings(input: { settings: Partial<Pick<Settings, 'selectedView' | 'theme' | 'globalShortcut' | 'launchAtLogin' | 'showCompleted' | 'opacity' | 'backgroundIntensity'>>; baseRevision: number }): Promise<MutationResult>;
+  setShortcutCapture(capturing: boolean): Promise<RuntimeStatus>;
   setEditMode(editing: boolean): Promise<RuntimeStatus>;
   retryDesktopBinding(): Promise<DesktopBindingStatus>;
   onSnapshotChanged(callback: (snapshot: AppSnapshot) => void): () => void;

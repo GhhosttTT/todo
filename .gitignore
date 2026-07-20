@@ -3,6 +3,7 @@ out/
 dist/
 release/
 coverage/
+artifacts/
 portable-data/
 portable.flag
 bootstrap.json

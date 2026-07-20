@@ -10,6 +10,7 @@ interface IpcDependencies {
   windowController: WindowController;
   runtime: RuntimeStatus;
   registerShortcut: (accelerator: string) => { ok: boolean; error?: string };
+  setShortcutCapture: (capturing: boolean) => void;
   applyLaunchAtLogin: (enabled: boolean) => void;
   onStoreChanged?: () => void;
   transientSettings?: Partial<Settings>;
@@ -87,6 +88,12 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     return changed;
   });
 
+  ipcMain.handle('todo:set-shortcut-capture', (_event, capturing: unknown) => {
+    if (typeof capturing !== 'boolean') throw new Error('快捷键录制参数无效。');
+    deps.setShortcutCapture(capturing);
+    return structuredClone(deps.runtime);
+  });
+
   ipcMain.handle('todo:set-edit-mode', async (_event, editing: unknown) => {
     if (typeof editing !== 'boolean') throw new Error('编辑模式参数无效。');
     await deps.windowController.setEditing(editing);
@@ -99,7 +106,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 export function clearIpcHandlers(): void {
   for (const channel of [
     'todo:get-snapshot', 'todo:create-task', 'todo:update-task', 'todo:set-completed', 'todo:delete-task',
-    'todo:restore-task', 'todo:reorder-tasks', 'todo:update-settings', 'todo:set-edit-mode', 'todo:retry-desktop-binding',
+    'todo:restore-task', 'todo:reorder-tasks', 'todo:update-settings', 'todo:set-shortcut-capture', 'todo:set-edit-mode', 'todo:retry-desktop-binding',
   ]) ipcMain.removeHandler(channel);
 }
 

@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { shortcutFromKeyInput } from './domain/shortcut';
 import { filterTasks, getViewCounts, localDateKey } from './domain/tasks';
 import type { AppSnapshot, MutationResult, Task, ViewId } from './types';
 
@@ -76,6 +77,8 @@ function App() {
   const [draft, setDraft] = useState<DraftTask>({ title: '', notes: '', dueDate: '', remindAt: '' });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutDraft, setShortcutDraft] = useState('Ctrl+Alt+T');
+  const [shortcutRecording, setShortcutRecording] = useState(false);
+  const [shortcutError, setShortcutError] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; kind: 'error' | 'info'; undoToken?: string } | null>(null);
   const activeTheme = snapshot?.settings.theme;
@@ -228,6 +231,59 @@ function App() {
     if (!snapshot) return;
     applyResult(await window.todo.updateSettings({ settings, baseRevision: snapshot.revision }));
   };
+
+  const startShortcutCapture = useCallback(async () => {
+    setShortcutRecording(true);
+    setShortcutError(null);
+    const runtime = await window.todo.setShortcutCapture(true);
+    setSnapshot((current) => current ? { ...current, runtime } : current);
+  }, []);
+
+  const stopShortcutCapture = useCallback(async () => {
+    setShortcutRecording(false);
+    const runtime = await window.todo.setShortcutCapture(false);
+    setSnapshot((current) => current ? { ...current, runtime } : current);
+  }, []);
+
+  const captureShortcut = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === 'Escape') {
+      setShortcutDraft(snapshot?.settings.globalShortcut ?? 'Ctrl+Alt+T');
+      setShortcutError(null);
+      event.currentTarget.blur();
+      return;
+    }
+
+    const result = shortcutFromKeyInput(event);
+    if (result.accelerator) {
+      setShortcutDraft(result.accelerator);
+      setShortcutError(null);
+    } else {
+      setShortcutError(result.error ?? '无法识别这个组合键。');
+    }
+  };
+
+  const applyShortcut = async () => {
+    if (!snapshot) return;
+    await stopShortcutCapture();
+    const result = await window.todo.updateSettings({
+      settings: { globalShortcut: shortcutDraft },
+      baseRevision: snapshot.revision,
+    });
+    if (applyResult(result)) {
+      setShortcutDraft(result.snapshot.settings.globalShortcut);
+      setShortcutError(null);
+      setNotice({ text: `全局快捷键已改为 ${result.snapshot.settings.globalShortcut}`, kind: 'info' });
+    } else {
+      setShortcutError(result.error ?? '快捷键不可用。');
+    }
+  };
+
+  useEffect(() => {
+    if (settingsOpen || !shortcutRecording) return;
+    void stopShortcutCapture();
+  }, [settingsOpen, shortcutRecording, stopShortcutCapture]);
 
   const exitEditing = async () => {
     if (editingId) setEditingId(null);
@@ -412,11 +468,28 @@ function App() {
 
           <section>
             <h3><Keyboard size={17} />全局快捷键</h3>
-            <div className="shortcut-control">
-              <input value={shortcutDraft} onChange={(event) => setShortcutDraft(event.target.value)} aria-label="全局快捷键" />
-              <button onClick={() => void changeSettings({ globalShortcut: shortcutDraft })}>应用</button>
+            <div className={`shortcut-control ${shortcutRecording ? 'is-recording' : ''}`}>
+              <input
+                value={shortcutDraft}
+                readOnly
+                aria-label="录制全局快捷键"
+                aria-invalid={Boolean(shortcutError)}
+                onFocus={() => void startShortcutCapture()}
+                onBlur={() => void stopShortcutCapture()}
+                onKeyDown={captureShortcut}
+              />
+              <button onMouseDown={(event) => event.preventDefault()} onClick={() => void applyShortcut()}>检测并应用</button>
             </div>
-            <StatusLine ok={snapshot.runtime.shortcutActive} text={snapshot.runtime.shortcutActive ? `已启用 ${snapshot.settings.globalShortcut}` : snapshot.runtime.shortcutError ?? '未激活'} />
+            <p className="shortcut-help">点击输入框后直接按组合键；应用时会检测是否被其他程序占用。</p>
+            <StatusLine
+              ok={!shortcutError && (shortcutRecording || snapshot.runtime.shortcutActive)}
+              text={shortcutError
+                ?? (shortcutRecording
+                  ? '正在录制，当前快捷键已暂时暂停。按 Esc 取消。'
+                  : snapshot.runtime.shortcutActive
+                    ? `已启用 ${snapshot.settings.globalShortcut}`
+                    : snapshot.runtime.shortcutError ?? '未激活')}
+            />
           </section>
 
           <section>

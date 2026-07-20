@@ -10,6 +10,7 @@ const api: TodoApi = {
   restoreDeletedTask: (input) => ipcRenderer.invoke('todo:restore-task', input),
   reorderTasks: (input) => ipcRenderer.invoke('todo:reorder-tasks', input),
   updateSettings: (input) => ipcRenderer.invoke('todo:update-settings', input),
+  setShortcutCapture: (capturing) => ipcRenderer.invoke('todo:set-shortcut-capture', capturing),
   setEditMode: (editing) => ipcRenderer.invoke('todo:set-edit-mode', editing),
   retryDesktopBinding: () => ipcRenderer.invoke('todo:retry-desktop-binding'),
   onSnapshotChanged: (callback) => {

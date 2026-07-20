@@ -34,6 +34,7 @@ let controller: WindowController | undefined;
 let reminders: ReminderScheduler | undefined;
 let quitting = false;
 let activeShortcut: string | undefined;
+let suspendedShortcut: string | undefined;
 let boundsSaveTimer: NodeJS.Timeout | undefined;
 let updateTrayMenu: (() => void) | undefined;
 
@@ -87,10 +88,27 @@ function registerGlobalShortcut(accelerator: string): { ok: boolean; error?: str
   }
   if (activeShortcut) globalShortcut.unregister(activeShortcut);
   activeShortcut = next;
+  suspendedShortcut = undefined;
   runtime.shortcutActive = true;
   runtime.shortcutError = undefined;
   broadcastRuntime();
   return { ok: true };
+}
+
+function setShortcutCapture(capturing: boolean): void {
+  if (capturing) {
+    if (activeShortcut) {
+      suspendedShortcut = activeShortcut;
+      globalShortcut.unregister(activeShortcut);
+      activeShortcut = undefined;
+      runtime.shortcutActive = false;
+      runtime.shortcutError = undefined;
+      broadcastRuntime();
+    }
+    return;
+  }
+
+  if (!activeShortcut && suspendedShortcut) registerGlobalShortcut(suspendedShortcut);
 }
 
 function fallbackIconSvg(): string {
@@ -186,6 +204,7 @@ async function createWindow(): Promise<void> {
     windowController: controller,
     runtime,
     registerShortcut: registerGlobalShortcut,
+    setShortcutCapture,
     applyLaunchAtLogin,
     onStoreChanged: () => reminders?.scheduleAll(),
     transientSettings: captureTheme ? { theme: captureTheme } : undefined,
