@@ -237,10 +237,14 @@ function App() {
 
   const changeLayoutMode = async (layoutMode: LayoutMode) => {
     if (!snapshot || snapshot.settings.layoutMode === layoutMode) return;
-    const baseRevision = snapshot.revision;
     setPendingLayoutMode(layoutMode);
     try {
-      applyResult(await window.todo.updateSettings({ settings: { layoutMode }, baseRevision }));
+      const latest = await window.todo.getSnapshot();
+      if (latest.settings.layoutMode === layoutMode) {
+        setSnapshot(latest);
+        return;
+      }
+      applyResult(await window.todo.updateSettings({ settings: { layoutMode }, baseRevision: latest.revision }));
     } finally {
       setPendingLayoutMode(null);
     }
