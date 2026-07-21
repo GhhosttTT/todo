@@ -12,10 +12,10 @@ import {
 import { dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { applyVisibleOrder, isValidDateKey } from '../src/domain/tasks';
-import type { Settings, Task, ViewId } from '../src/types';
+import { dimensionsForLayout } from '../src/domain/layout';
+import type { LayoutMode, Settings, Task, ViewId, WindowBounds } from '../src/types';
 
-const SCHEMA_VERSION = 2;
-const FIXED_WINDOW_HEIGHT = 620;
+const SCHEMA_VERSION = 3;
 const require = createRequire(import.meta.url);
 type ReplaceFileApi = (replaced: string, replacement: string, backup: string, flags: number, exclude: null, reserved: null) => boolean;
 let replaceFileApi: ReplaceFileApi | undefined;
@@ -71,7 +71,9 @@ export class ReadOnlyStoreError extends Error {
 export function createDefaultSettings(): Settings {
   return {
     selectedView: 'all',
+    layoutMode: 'expanded',
     windowBounds: { x: 120, y: 100, width: 900, height: 620 },
+    compactWindowBounds: { x: 120, y: 100, width: 400, height: 620 },
     theme: 'light',
     globalShortcut: 'Ctrl+Alt+T',
     launchAtLogin: false,
@@ -89,12 +91,28 @@ function isViewId(value: unknown): value is ViewId {
   return value === 'today' || value === 'scheduled' || value === 'all';
 }
 
+function isLayoutMode(value: unknown): value is LayoutMode {
+  return value === 'expanded' || value === 'compact';
+}
+
 function isValidTimestamp(value: string | null): boolean {
   return value === null || (typeof value === 'string' && Number.isFinite(Date.parse(value)));
 }
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function parseWindowBounds(value: unknown, fallback: WindowBounds, layoutMode: LayoutMode): WindowBounds {
+  const bounds = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const dimensions = dimensionsForLayout(layoutMode);
+  return {
+    x: finiteNumber(bounds.x, fallback.x),
+    y: finiteNumber(bounds.y, fallback.y),
+    ...dimensions,
+    displayId: typeof bounds.displayId === 'string' ? bounds.displayId : undefined,
+    scaleFactor: finiteNumber(bounds.scaleFactor, fallback.scaleFactor ?? 1),
+  };
 }
 
 function parseTask(value: unknown): Task | null {
@@ -128,19 +146,11 @@ function parseSettings(value: unknown): Settings {
   const defaults = createDefaultSettings();
   if (!value || typeof value !== 'object') return defaults;
   const item = value as Record<string, unknown>;
-  const bounds = item.windowBounds && typeof item.windowBounds === 'object'
-    ? item.windowBounds as Record<string, unknown>
-    : {};
   return {
     selectedView: isViewId(item.selectedView) ? item.selectedView : defaults.selectedView,
-    windowBounds: {
-      x: finiteNumber(bounds.x, defaults.windowBounds.x),
-      y: finiteNumber(bounds.y, defaults.windowBounds.y),
-      width: Math.max(680, finiteNumber(bounds.width, defaults.windowBounds.width)),
-      height: FIXED_WINDOW_HEIGHT,
-      displayId: typeof bounds.displayId === 'string' ? bounds.displayId : undefined,
-      scaleFactor: finiteNumber(bounds.scaleFactor, 1),
-    },
+    layoutMode: isLayoutMode(item.layoutMode) ? item.layoutMode : defaults.layoutMode,
+    windowBounds: parseWindowBounds(item.windowBounds, defaults.windowBounds, 'expanded'),
+    compactWindowBounds: parseWindowBounds(item.compactWindowBounds, defaults.compactWindowBounds, 'compact'),
     theme: item.theme === 'dark' ? 'dark' : 'light',
     globalShortcut: typeof item.globalShortcut === 'string' && item.globalShortcut.trim() ? item.globalShortcut : defaults.globalShortcut,
     launchAtLogin: typeof item.launchAtLogin === 'boolean' ? item.launchAtLogin : defaults.launchAtLogin,

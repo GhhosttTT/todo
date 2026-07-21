@@ -9,6 +9,8 @@ import {
   HardDrive,
   Inbox,
   Keyboard,
+  LayoutPanelLeft,
+  LayoutPanelTop,
   Layers3,
   MonitorDown,
   Plus,
@@ -316,7 +318,7 @@ function App() {
 
   return (
     <div
-      className={`app-shell theme-${snapshot.settings.theme} ${editing ? 'is-editing' : 'is-viewing'}`}
+      className={`app-shell theme-${snapshot.settings.theme} layout-${snapshot.settings.layoutMode} ${editing ? 'is-editing' : 'is-viewing'}`}
       style={{ '--surface-opacity': snapshot.settings.opacity, '--background-intensity': snapshot.settings.backgroundIntensity } as React.CSSProperties}
     >
       <aside className="sidebar">
@@ -435,7 +437,7 @@ function App() {
                         <span className="task-meta">
                           {task.dueDate && <span className={task.dueDate < todayKey && !task.completedAt ? 'overdue' : ''}><CalendarDays size={13} />{task.dueDate}</span>}
                           {task.remindAt && <span><Clock3 size={13} />{formatReminder(task.remindAt)}</span>}
-                          {task.notes && <span>{task.notes}</span>}
+                          {task.notes && <span className="task-notes">{task.notes}</span>}
                         </span>
                       )}
                     </button>
@@ -447,12 +449,31 @@ function App() {
         </section>
       </main>
 
+      {!editing && snapshot.settings.layoutMode === 'compact' && (
+        <div className="shortcut-hint compact-shortcut-hint" aria-label={`按 ${snapshot.settings.globalShortcut} 进入编辑模式`}>
+          <Keyboard size={13} />
+          <kbd>{snapshot.settings.globalShortcut}</kbd>
+        </div>
+      )}
+
       {settingsOpen && (
         <aside className="settings-drawer" aria-label="设置与运行状态">
           <header>
             <div><span>SETTINGS</span><h2>设置与状态</h2></div>
             <button className="icon-button" onClick={() => setSettingsOpen(false)} title="关闭设置"><X size={20} /></button>
           </header>
+
+          <section>
+            <h3><LayoutPanelTop size={17} />窗口布局</h3>
+            <div className="theme-segmented layout-segmented" aria-label="窗口布局">
+              <button className={snapshot.settings.layoutMode === 'compact' ? 'active' : ''} onClick={() => void changeSettings({ layoutMode: 'compact' })}>
+                <LayoutPanelTop size={15} />紧凑
+              </button>
+              <button className={snapshot.settings.layoutMode === 'expanded' ? 'active' : ''} onClick={() => void changeSettings({ layoutMode: 'expanded' })}>
+                <LayoutPanelLeft size={15} />展开
+              </button>
+            </div>
+          </section>
 
           <section>
             <h3><Sun size={17} />外观主题</h3>

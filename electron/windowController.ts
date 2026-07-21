@@ -1,8 +1,10 @@
 import { app, BrowserWindow, screen } from 'electron';
+import { LAYOUT_DIMENSIONS } from '../src/domain/layout';
 import type { DesktopBindingStatus, RuntimeStatus, WindowBounds, WindowMode } from '../src/types';
 import { DesktopLayer } from './desktopLayer';
 
 export const FIXED_WINDOW_HEIGHT = 620;
+export const MINIMUM_WINDOW_WIDTH = LAYOUT_DIMENSIONS.compact.width;
 const FOCUS_BOOST_DURATION_MS = 900;
 
 export class WindowController {
@@ -48,7 +50,7 @@ export class WindowController {
     const preferred = bounds.displayId ? displays.find(({ id }) => String(id) === bounds.displayId) : undefined;
     const target = preferred ?? screen.getDisplayMatching(bounds);
     const area = target.workArea;
-    const width = Math.min(Math.max(bounds.width, 680), area.width);
+    const width = Math.min(Math.max(bounds.width, MINIMUM_WINDOW_WIDTH), area.width);
     const height = Math.min(FIXED_WINDOW_HEIGHT, area.height);
     return {
       x: Math.min(Math.max(bounds.x, area.x), area.x + area.width - width),
@@ -56,6 +58,12 @@ export class WindowController {
       width,
       height,
     };
+  }
+
+  applyLayoutBounds(bounds: WindowBounds): Electron.Rectangle {
+    const safe = this.safeBounds(bounds);
+    this.window.setBounds(safe, true);
+    return safe;
   }
 
   currentBounds(): WindowBounds {

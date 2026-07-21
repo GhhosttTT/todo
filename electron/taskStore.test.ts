@@ -21,7 +21,7 @@ describe('TaskStore', () => {
     expect(store.load().settings.selectedView).toBe('all');
   });
 
-  it('keeps the widget height fixed when loading saved bounds', () => {
+  it('normalizes legacy bounds to the fixed expanded layout size', () => {
     const store = createStore();
     writeFileSync(store.stateFile, JSON.stringify({
       schemaVersion: 2,
@@ -30,7 +30,20 @@ describe('TaskStore', () => {
       settings: { windowBounds: { x: 10, y: 20, width: 760, height: 1200 } },
     }), 'utf8');
 
-    expect(store.load().settings.windowBounds).toMatchObject({ width: 760, height: 620 });
+    expect(store.load().settings.windowBounds).toMatchObject({ x: 10, y: 20, width: 900, height: 620 });
+  });
+
+  it('persists compact mode with a separate fixed-size window position', async () => {
+    const store = createStore();
+    const loaded = store.load();
+    const changed = await store.updateSettings(loaded.revision, {
+      layoutMode: 'compact',
+      compactWindowBounds: { x: 1320, y: 180, width: 999, height: 999 },
+    });
+
+    expect(changed.settings.layoutMode).toBe('compact');
+    expect(changed.settings.compactWindowBounds).toMatchObject({ x: 1320, y: 180, width: 400, height: 620 });
+    expect(new TaskStore(store.stateFile).load().settings.compactWindowBounds).toMatchObject({ x: 1320, y: 180, width: 400, height: 620 });
   });
 
   it('uses light theme by default and persists a dark theme choice', async () => {

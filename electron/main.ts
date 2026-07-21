@@ -3,12 +3,13 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AppSnapshot, RuntimeStatus } from '../src/types';
+import { dimensionsForLayout } from '../src/domain/layout';
 import { DesktopLayer } from './desktopLayer';
 import { clearIpcHandlers, registerIpcHandlers } from './ipc';
 import { ReminderScheduler } from './reminderScheduler';
 import { resolveHostExecutablePath, resolvePathsFromEnvironment } from './runtimePaths';
 import { TaskStore } from './taskStore';
-import { FIXED_WINDOW_HEIGHT, WindowController } from './windowController';
+import { FIXED_WINDOW_HEIGHT, MINIMUM_WINDOW_WIDTH, WindowController } from './windowController';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const hostExecutablePath = resolveHostExecutablePath(
@@ -165,6 +166,9 @@ function createTray(): void {
 
 async function createWindow(): Promise<void> {
   const loaded = store.load();
+  const initialBounds = loaded.settings.layoutMode === 'compact'
+    ? loaded.settings.compactWindowBounds
+    : loaded.settings.windowBounds;
   runtime.readOnly = loaded.readOnly;
   runtime.persistenceError = loaded.recoveryMessage;
   applyLaunchAtLogin(loaded.settings.launchAtLogin);
@@ -177,11 +181,12 @@ async function createWindow(): Promise<void> {
   }
 
   mainWindow = new BrowserWindow({
-    ...loaded.settings.windowBounds,
-    minWidth: 680,
+    ...initialBounds,
+    minWidth: MINIMUM_WINDOW_WIDTH,
     height: FIXED_WINDOW_HEIGHT,
     minHeight: FIXED_WINDOW_HEIGHT,
     maxHeight: FIXED_WINDOW_HEIGHT,
+    resizable: false,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
@@ -200,7 +205,7 @@ async function createWindow(): Promise<void> {
   mainWindow.setOpacity(loaded.settings.opacity);
   controller = new WindowController(mainWindow, desktopLayer, runtime, broadcastRuntime);
   reminders = new ReminderScheduler(store, broadcastSnapshot, () => { void controller?.setEditing(true); }, loadIcon(64));
-  mainWindow.setBounds(controller.safeBounds(loaded.settings.windowBounds));
+  mainWindow.setBounds(controller.safeBounds(initialBounds));
 
   registerIpcHandlers({
     store,
@@ -210,6 +215,10 @@ async function createWindow(): Promise<void> {
     registerShortcut: registerGlobalShortcut,
     setShortcutCapture,
     applyLaunchAtLogin,
+    applyLayoutMode: (settings) => {
+      const bounds = settings.layoutMode === 'compact' ? settings.compactWindowBounds : settings.windowBounds;
+      controller?.applyLayoutBounds({ ...bounds, ...dimensionsForLayout(settings.layoutMode) });
+    },
     onStoreChanged: () => reminders?.scheduleAll(),
     transientSettings: captureTheme ? { theme: captureTheme } : undefined,
   });
@@ -231,7 +240,8 @@ async function createWindow(): Promise<void> {
       if (!controller) return;
       try {
         const current = store.getSnapshot();
-        await store.updateSettings(current.revision, { windowBounds: controller.currentBounds() });
+        const boundsKey = current.settings.layoutMode === 'compact' ? 'compactWindowBounds' : 'windowBounds';
+        await store.updateSettings(current.revision, { [boundsKey]: controller.currentBounds() });
         broadcastSnapshot();
       } catch (error) {
         runtime.persistenceError = error instanceof Error ? error.message : '窗口位置保存失败。';
@@ -251,8 +261,8 @@ async function createWindow(): Promise<void> {
     if (captureSize && /^\d+x\d+$/.test(captureSize)) {
       const [width] = captureSize.split('x').map(Number);
       const bounds = mainWindow.getBounds();
-      mainWindow.setBounds({ ...bounds, width: Math.max(680, width), height: FIXED_WINDOW_HEIGHT }, false);
-      mainWindow.setContentSize(Math.max(680, width), FIXED_WINDOW_HEIGHT, false);
+      mainWindow.setBounds({ ...bounds, width: Math.max(MINIMUM_WINDOW_WIDTH, width), height: FIXED_WINDOW_HEIGHT }, false);
+      mainWindow.setContentSize(Math.max(MINIMUM_WINDOW_WIDTH, width), FIXED_WINDOW_HEIGHT, false);
     }
     if (captureSettings) {
       await mainWindow.webContents.executeJavaScript(`new Promise((resolve) => {
