@@ -6,12 +6,16 @@ import type { AppSnapshot, RuntimeStatus } from '../src/types';
 import { DesktopLayer } from './desktopLayer';
 import { clearIpcHandlers, registerIpcHandlers } from './ipc';
 import { ReminderScheduler } from './reminderScheduler';
-import { resolvePathsFromEnvironment } from './runtimePaths';
+import { resolveHostExecutablePath, resolvePathsFromEnvironment } from './runtimePaths';
 import { TaskStore } from './taskStore';
 import { FIXED_WINDOW_HEIGHT, WindowController } from './windowController';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
-const appRoot = app.isPackaged ? dirname(process.execPath) : process.cwd();
+const hostExecutablePath = resolveHostExecutablePath(
+  process.execPath,
+  app.isPackaged ? process.env.PORTABLE_EXECUTABLE_FILE : undefined,
+);
+const appRoot = app.isPackaged ? dirname(hostExecutablePath) : process.cwd();
 const assetRoot = app.isPackaged ? join(currentDirectory, '../renderer') : join(appRoot, 'assets');
 const defaultUserData = app.getPath('userData');
 const paths = resolvePathsFromEnvironment(appRoot, defaultUserData, process.argv, assetRoot);
@@ -70,7 +74,7 @@ function applyLaunchAtLogin(enabled: boolean): void {
   if (process.platform !== 'win32') return;
   app.setLoginItemSettings({
     openAtLogin: enabled,
-    path: process.execPath,
+    path: hostExecutablePath,
     args: [],
   });
 }

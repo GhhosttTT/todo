@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { resolveRuntimePaths } from './runtimePaths';
+import { resolveHostExecutablePath, resolveRuntimePaths } from './runtimePaths';
+
+describe('resolveHostExecutablePath', () => {
+  it('uses the original portable launcher instead of the extracted temporary executable', () => {
+    expect(resolveHostExecutablePath(
+      'C:\\Users\\A\\AppData\\Local\\Temp\\todo\\Todo.exe',
+      'E:\\Apps\\Desktop Todo Widget.exe',
+    )).toBe('E:\\Apps\\Desktop Todo Widget.exe');
+  });
+
+  it('falls back to the running executable outside portable packaging', () => {
+    expect(resolveHostExecutablePath('C:\\Apps\\Todo\\Todo.exe')).toBe('C:\\Apps\\Todo\\Todo.exe');
+  });
+});
 
 describe('resolveRuntimePaths', () => {
   it('uses the normal user data directory by default', () => {

@@ -23,6 +23,11 @@ export interface ResolvePathOptions {
   writable?: (path: string) => boolean;
 }
 
+export function resolveHostExecutablePath(execPath: string, portableExecutableFile?: string): string {
+  const portablePath = portableExecutableFile?.trim();
+  return resolve(portablePath || execPath);
+}
+
 export function probeWritable(path: string): boolean {
   const probe = join(path, `.write-probe-${process.pid}-${Date.now()}`);
   try {
