@@ -435,9 +435,13 @@ function App() {
                       <span className="task-title">{task.title}</span>
                       {(task.notes || task.dueDate || task.remindAt) && (
                         <span className="task-meta">
-                          {task.dueDate && <span className={task.dueDate < todayKey && !task.completedAt ? 'overdue' : ''}><CalendarDays size={13} />{task.dueDate}</span>}
-                          {task.remindAt && <span><Clock3 size={13} />{formatReminder(task.remindAt)}</span>}
                           {task.notes && <span className="task-notes">{task.notes}</span>}
+                          {(task.dueDate || task.remindAt) && (
+                            <span className="task-timing-row">
+                              {task.dueDate && <span className={task.dueDate < todayKey && !task.completedAt ? 'overdue' : ''}><CalendarDays size={13} />{task.dueDate}</span>}
+                              {task.remindAt && <span><Clock3 size={13} />{formatReminder(task.remindAt)}</span>}
+                            </span>
+                          )}
                         </span>
                       )}
                     </button>

@@ -329,9 +329,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .task-content:not(:disabled) { cursor: text; }
 .task-title { overflow-wrap: anywhere; font-size: 14px; line-height: 1.45; }
 .completed .task-title { color: #989da5; text-decoration: line-through; }
-.task-meta { min-width: 0; display: flex; gap: 12px; color: #8d929b; font-size: 11px; }
-.task-meta > span { min-width: 0; display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.task-meta .task-notes { flex-basis: 100%; overflow: visible; overflow-wrap: anywhere; white-space: normal; }
+.task-meta { min-width: 0; display: grid; gap: 4px; color: #8d929b; font-size: 11px; }
+.task-meta .task-notes { overflow-wrap: anywhere; white-space: normal; }
+.task-timing-row { min-width: 0; display: flex; align-items: center; gap: 12px; white-space: nowrap; }
+.task-timing-row > span { min-width: 0; display: flex; align-items: center; gap: 4px; }
 .task-meta .overdue { color: #d65149; }
 
 .task-editor, .composer-fields { min-width: 0; display: grid; gap: 8px; }
@@ -482,13 +483,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .layout-compact .composer { grid-template-columns: 23px minmax(0, 1fr); }
 .layout-compact .drag-handle svg { width: 14px; }
 .layout-compact .task-title { font-size: 13px; }
-.layout-compact .task-meta { flex-direction: column; align-items: stretch; gap: 3px; }
-.layout-compact .task-meta > span {
-  overflow: visible;
-  overflow-wrap: anywhere;
-  text-overflow: clip;
-  white-space: normal;
-}
+.layout-compact .task-meta { gap: 3px; }
+.layout-compact .task-timing-row { gap: 10px; }
 .layout-compact .editor-footer { align-items: stretch; }
 .layout-compact .editor-footer label { width: 100%; min-height: 28px; }
 .layout-compact .editor-footer input[type='date'],
