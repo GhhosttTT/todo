@@ -351,7 +351,7 @@ function App() {
         {editing ? (
           <div className="sidebar-actions">
             <button aria-label="打开设置" className={`sidebar-command ${runtimeWarning ? 'has-warning' : ''}`} onClick={() => setSettingsOpen(true)}>
-              {runtimeWarning ? <CircleAlert size={18} /> : <SettingsIcon size={18} />}
+              <SettingsIcon size={18} />
               <span>设置与状态</span>
             </button>
             <button className="sidebar-command primary" onClick={() => void exitEditing()}>
@@ -457,6 +457,19 @@ function App() {
         <div className="shortcut-hint compact-shortcut-hint" aria-label={`按 ${snapshot.settings.globalShortcut} 进入编辑模式`}>
           <Keyboard size={13} />
           <kbd>{snapshot.settings.globalShortcut}</kbd>
+        </div>
+      )}
+
+      {editing && snapshot.settings.layoutMode === 'compact' && (
+        <div className="compact-edit-actions">
+          <button aria-label="打开设置" className={`sidebar-command ${runtimeWarning ? 'has-warning' : ''}`} onClick={() => setSettingsOpen(true)}>
+            <SettingsIcon size={18} />
+            <span>设置与状态</span>
+          </button>
+          <button className="sidebar-command primary" onClick={() => void exitEditing()}>
+            <Check size={18} />
+            <span>完成编辑</span>
+          </button>
         </div>
       )}
 
