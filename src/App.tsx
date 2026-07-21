@@ -25,7 +25,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { shortcutFromKeyInput } from './domain/shortcut';
 import { filterTasks, getViewCounts, localDateKey } from './domain/tasks';
-import type { AppSnapshot, MutationResult, Task, ViewId } from './types';
+import type { AppSnapshot, LayoutMode, MutationResult, Task, ViewId } from './types';
 
 const viewMeta = {
   today: { label: 'Today', hint: '今天与逾期', icon: CalendarDays, tone: 'blue' },
@@ -232,6 +232,13 @@ function App() {
   const changeSettings = async (settings: Parameters<typeof window.todo.updateSettings>[0]['settings']) => {
     if (!snapshot) return;
     applyResult(await window.todo.updateSettings({ settings, baseRevision: snapshot.revision }));
+  };
+
+  const changeLayoutMode = async (layoutMode: LayoutMode) => {
+    if (!snapshot || snapshot.settings.layoutMode === layoutMode) return;
+    const baseRevision = snapshot.revision;
+    setSnapshot((current) => current ? { ...current, settings: { ...current.settings, layoutMode } } : current);
+    applyResult(await window.todo.updateSettings({ settings: { layoutMode }, baseRevision }));
   };
 
   const startShortcutCapture = useCallback(async () => {
@@ -483,10 +490,10 @@ function App() {
           <section>
             <h3><LayoutPanelTop size={17} />窗口布局</h3>
             <div className="theme-segmented layout-segmented" aria-label="窗口布局">
-              <button className={snapshot.settings.layoutMode === 'compact' ? 'active' : ''} onClick={() => void changeSettings({ layoutMode: 'compact' })}>
+              <button className={snapshot.settings.layoutMode === 'compact' ? 'active' : ''} onClick={() => void changeLayoutMode('compact')}>
                 <LayoutPanelTop size={15} />紧凑
               </button>
-              <button className={snapshot.settings.layoutMode === 'expanded' ? 'active' : ''} onClick={() => void changeSettings({ layoutMode: 'expanded' })}>
+              <button className={snapshot.settings.layoutMode === 'expanded' ? 'active' : ''} onClick={() => void changeLayoutMode('expanded')}>
                 <LayoutPanelLeft size={15} />展开
               </button>
             </div>

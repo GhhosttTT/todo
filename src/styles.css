@@ -427,9 +427,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .layout-compact .view-tile,
 .layout-compact .view-tile:last-child {
   grid-column: auto;
-  height: 72px;
+  height: 62px;
   grid-template-columns: 24px minmax(0, 1fr);
-  grid-template-rows: 24px 18px 13px;
+  grid-template-rows: 24px 18px;
   padding: 7px;
 }
 
@@ -438,12 +438,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .layout-compact .view-tile strong { font-size: 18px; }
 .layout-compact .view-tile > span:not(.view-icon) { font-size: 12px; }
 .layout-compact .view-tile small {
-  display: block;
-  overflow: visible;
-  font-size: 9px;
-  line-height: 1.2;
-  text-overflow: clip;
-  white-space: normal;
+  display: none;
 }
 
 .layout-compact .sidebar-spacer { display: none; }
