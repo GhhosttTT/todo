@@ -427,16 +427,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .layout-compact .view-tile,
 .layout-compact .view-tile:last-child {
   grid-column: auto;
-  height: 62px;
-  grid-template-columns: 24px minmax(0, 1fr);
-  grid-template-rows: 24px 18px;
-  padding: 7px;
+  height: 66px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-rows: 28px 19px;
+  padding: 8px;
 }
 
-.layout-compact .view-icon { width: 23px; height: 23px; }
-.layout-compact .view-icon svg { width: 14px; height: 14px; }
-.layout-compact .view-tile strong { font-size: 18px; }
-.layout-compact .view-tile > span:not(.view-icon) { font-size: 12px; }
+.layout-compact .view-icon { width: 27px; height: 27px; }
+.layout-compact .view-icon svg { width: 16px; height: 16px; }
+.layout-compact .view-tile strong { font-size: 20px; }
+.layout-compact .view-tile > span:not(.view-icon) { font-size: 13px; line-height: 1.1; }
 .layout-compact .view-tile small {
   display: none;
 }

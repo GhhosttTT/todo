@@ -82,6 +82,7 @@ function App() {
   const [shortcutRecording, setShortcutRecording] = useState(false);
   const [shortcutError, setShortcutError] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [pendingLayoutMode, setPendingLayoutMode] = useState<LayoutMode | null>(null);
   const [notice, setNotice] = useState<{ text: string; kind: 'error' | 'info'; undoToken?: string } | null>(null);
   const activeTheme = snapshot?.settings.theme;
 
@@ -237,8 +238,12 @@ function App() {
   const changeLayoutMode = async (layoutMode: LayoutMode) => {
     if (!snapshot || snapshot.settings.layoutMode === layoutMode) return;
     const baseRevision = snapshot.revision;
-    setSnapshot((current) => current ? { ...current, settings: { ...current.settings, layoutMode } } : current);
-    applyResult(await window.todo.updateSettings({ settings: { layoutMode }, baseRevision }));
+    setPendingLayoutMode(layoutMode);
+    try {
+      applyResult(await window.todo.updateSettings({ settings: { layoutMode }, baseRevision }));
+    } finally {
+      setPendingLayoutMode(null);
+    }
   };
 
   const startShortcutCapture = useCallback(async () => {
@@ -490,10 +495,10 @@ function App() {
           <section>
             <h3><LayoutPanelTop size={17} />窗口布局</h3>
             <div className="theme-segmented layout-segmented" aria-label="窗口布局">
-              <button className={snapshot.settings.layoutMode === 'compact' ? 'active' : ''} onClick={() => void changeLayoutMode('compact')}>
+              <button className={(pendingLayoutMode ?? snapshot.settings.layoutMode) === 'compact' ? 'active' : ''} onClick={() => void changeLayoutMode('compact')}>
                 <LayoutPanelTop size={15} />紧凑
               </button>
-              <button className={snapshot.settings.layoutMode === 'expanded' ? 'active' : ''} onClick={() => void changeLayoutMode('expanded')}>
+              <button className={(pendingLayoutMode ?? snapshot.settings.layoutMode) === 'expanded' ? 'active' : ''} onClick={() => void changeLayoutMode('expanded')}>
                 <LayoutPanelLeft size={15} />展开
               </button>
             </div>
