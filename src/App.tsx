@@ -523,15 +523,24 @@ function App() {
 
           <section>
             <h3><Clock3 size={17} />提醒停留</h3>
-            <div className="theme-segmented" aria-label="提醒停留时长">
+            <div className="theme-segmented triple" aria-label="提醒停留时长">
               <button className={snapshot.settings.notificationTimeoutType === 'default' ? 'active' : ''} onClick={() => void changeSettings({ notificationTimeoutType: 'default' })}>
                 系统默认
+              </button>
+              <button className={snapshot.settings.notificationTimeoutType === 'custom' ? 'active' : ''} onClick={() => void changeSettings({ notificationTimeoutType: 'custom' })}>
+                自定义
               </button>
               <button className={snapshot.settings.notificationTimeoutType === 'never' ? 'active' : ''} onClick={() => void changeSettings({ notificationTimeoutType: 'never' })}>
                 手动关闭
               </button>
             </div>
-            <p className="shortcut-help">手动关闭会让系统提醒保持悬浮，直到用户关闭通知。</p>
+            {snapshot.settings.notificationTimeoutType === 'custom' && (
+              <label className="range-row compact-range">
+                <span>{snapshot.settings.notificationDurationSeconds} 秒后关闭</span>
+                <input type="range" min="3" max="300" step="1" value={snapshot.settings.notificationDurationSeconds} onChange={(event) => void changeSettings({ notificationDurationSeconds: Number(event.target.value) })} />
+              </label>
+            )}
+            <p className="shortcut-help">自定义会先保持悬浮，再按设定秒数关闭；手动关闭会一直悬浮直到用户关闭通知。</p>
           </section>
 
           <section>

@@ -79,6 +79,7 @@ export function createDefaultSettings(): Settings {
     launchAtLogin: false,
     showCompleted: false,
     notificationTimeoutType: 'default',
+    notificationDurationSeconds: 12,
     opacity: 0.96,
     backgroundIntensity: 0.78,
   };
@@ -97,7 +98,7 @@ function isLayoutMode(value: unknown): value is LayoutMode {
 }
 
 function isNotificationTimeoutType(value: unknown): value is NotificationTimeoutType {
-  return value === 'default' || value === 'never';
+  return value === 'default' || value === 'custom' || value === 'never';
 }
 
 function isValidTimestamp(value: string | null): boolean {
@@ -161,6 +162,7 @@ function parseSettings(value: unknown): Settings {
     launchAtLogin: typeof item.launchAtLogin === 'boolean' ? item.launchAtLogin : defaults.launchAtLogin,
     showCompleted: typeof item.showCompleted === 'boolean' ? item.showCompleted : defaults.showCompleted,
     notificationTimeoutType: isNotificationTimeoutType(item.notificationTimeoutType) ? item.notificationTimeoutType : defaults.notificationTimeoutType,
+    notificationDurationSeconds: Math.round(Math.min(300, Math.max(3, finiteNumber(item.notificationDurationSeconds, defaults.notificationDurationSeconds)))),
     opacity: Math.min(1, Math.max(0.72, finiteNumber(item.opacity, defaults.opacity))),
     backgroundIntensity: Math.min(1, Math.max(0, finiteNumber(item.backgroundIntensity, defaults.backgroundIntensity))),
   };

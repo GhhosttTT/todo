@@ -2,7 +2,7 @@ export type ViewId = 'today' | 'scheduled' | 'all' | 'completed';
 export type DataMode = 'normal' | 'portable';
 export type Theme = 'light' | 'dark';
 export type LayoutMode = 'expanded' | 'compact';
-export type NotificationTimeoutType = 'default' | 'never';
+export type NotificationTimeoutType = 'default' | 'custom' | 'never';
 export type WindowMode = 'starting' | 'viewing-desktop' | 'viewing-fallback' | 'entering-editing' | 'editing' | 'exiting-editing' | 'rebinding' | 'hidden';
 
 export interface Task {
@@ -37,6 +37,7 @@ export interface Settings {
   launchAtLogin: boolean;
   showCompleted: boolean;
   notificationTimeoutType: NotificationTimeoutType;
+  notificationDurationSeconds: number;
   opacity: number;
   backgroundIntensity: number;
 }
@@ -102,7 +103,7 @@ export interface TodoApi {
   deleteTask(input: { id: string; baseRevision: number }): Promise<MutationResult>;
   restoreDeletedTask(input: { token: string; baseRevision: number }): Promise<MutationResult>;
   reorderTasks(input: { ids: string[]; baseRevision: number }): Promise<MutationResult>;
-  updateSettings(input: { settings: Partial<Pick<Settings, 'selectedView' | 'layoutMode' | 'theme' | 'globalShortcut' | 'launchAtLogin' | 'showCompleted' | 'notificationTimeoutType' | 'opacity' | 'backgroundIntensity'>>; baseRevision: number }): Promise<MutationResult>;
+  updateSettings(input: { settings: Partial<Pick<Settings, 'selectedView' | 'layoutMode' | 'theme' | 'globalShortcut' | 'launchAtLogin' | 'showCompleted' | 'notificationTimeoutType' | 'notificationDurationSeconds' | 'opacity' | 'backgroundIntensity'>>; baseRevision: number }): Promise<MutationResult>;
   setShortcutCapture(capturing: boolean): Promise<RuntimeStatus>;
   setEditMode(editing: boolean): Promise<RuntimeStatus>;
   retryDesktopBinding(): Promise<DesktopBindingStatus>;

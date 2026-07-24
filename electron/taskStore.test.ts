@@ -58,9 +58,12 @@ describe('TaskStore', () => {
     const store = createStore();
     const loaded = store.load();
 
-    await store.updateSettings(loaded.revision, { notificationTimeoutType: 'never' });
+    await store.updateSettings(loaded.revision, { notificationTimeoutType: 'custom', notificationDurationSeconds: 45 });
 
-    expect(new TaskStore(store.stateFile).load().settings.notificationTimeoutType).toBe('never');
+    expect(new TaskStore(store.stateFile).load().settings).toMatchObject({
+      notificationTimeoutType: 'custom',
+      notificationDurationSeconds: 45,
+    });
   });
 
   it('persists mutations and reloads them', async () => {
