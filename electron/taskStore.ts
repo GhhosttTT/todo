@@ -13,7 +13,7 @@ import { dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { applyVisibleOrder, isValidDateKey } from '../src/domain/tasks';
 import { dimensionsForLayout } from '../src/domain/layout';
-import type { LayoutMode, Settings, Task, ViewId, WindowBounds } from '../src/types';
+import type { LayoutMode, NotificationTimeoutType, Settings, Task, ViewId, WindowBounds } from '../src/types';
 
 const SCHEMA_VERSION = 3;
 const require = createRequire(import.meta.url);
@@ -78,6 +78,7 @@ export function createDefaultSettings(): Settings {
     globalShortcut: 'Ctrl+Alt+T',
     launchAtLogin: false,
     showCompleted: false,
+    notificationTimeoutType: 'default',
     opacity: 0.96,
     backgroundIntensity: 0.78,
   };
@@ -93,6 +94,10 @@ function isViewId(value: unknown): value is ViewId {
 
 function isLayoutMode(value: unknown): value is LayoutMode {
   return value === 'expanded' || value === 'compact';
+}
+
+function isNotificationTimeoutType(value: unknown): value is NotificationTimeoutType {
+  return value === 'default' || value === 'never';
 }
 
 function isValidTimestamp(value: string | null): boolean {
@@ -155,6 +160,7 @@ function parseSettings(value: unknown): Settings {
     globalShortcut: typeof item.globalShortcut === 'string' && item.globalShortcut.trim() ? item.globalShortcut : defaults.globalShortcut,
     launchAtLogin: typeof item.launchAtLogin === 'boolean' ? item.launchAtLogin : defaults.launchAtLogin,
     showCompleted: typeof item.showCompleted === 'boolean' ? item.showCompleted : defaults.showCompleted,
+    notificationTimeoutType: isNotificationTimeoutType(item.notificationTimeoutType) ? item.notificationTimeoutType : defaults.notificationTimeoutType,
     opacity: Math.min(1, Math.max(0.72, finiteNumber(item.opacity, defaults.opacity))),
     backgroundIntensity: Math.min(1, Math.max(0, finiteNumber(item.backgroundIntensity, defaults.backgroundIntensity))),
   };

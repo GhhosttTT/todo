@@ -3,7 +3,7 @@ import type { Task } from '../src/types';
 
 const notificationMock = vi.hoisted(() => {
   const instances: Array<{
-    options: { title: string; body: string };
+    options: { title: string; body: string; timeoutType?: 'default' | 'never' };
     handlers: Map<string, () => void>;
     show: ReturnType<typeof vi.fn>;
   }> = [];
@@ -12,7 +12,7 @@ const notificationMock = vi.hoisted(() => {
     handlers = new Map<string, () => void>();
     show = vi.fn();
 
-    constructor(public options: { title: string; body: string }) {
+    constructor(public options: { title: string; body: string; timeoutType?: 'default' | 'never' }) {
       instances.push(this);
     }
 
@@ -71,7 +71,7 @@ describe('ReminderScheduler', () => {
     });
     const onChanged = vi.fn();
     const onOpenTask = vi.fn();
-    const store = { getSnapshot: () => ({ tasks }), markReminderNotified };
+    const store = { getSnapshot: () => ({ tasks, settings: { notificationTimeoutType: 'default' } }), markReminderNotified };
     const scheduler = new ReminderScheduler(store as never, onChanged, onOpenTask);
 
     scheduler.scheduleAll();
@@ -84,12 +84,27 @@ describe('ReminderScheduler', () => {
       title: 'Todo 提醒',
       body: '测试到期提醒\n保存任务后应按时通知',
     });
+    expect(notificationMock.instances[0].options.timeoutType).toBe('default');
     expect(notificationMock.instances[0].show).toHaveBeenCalledOnce();
     expect(markReminderNotified).toHaveBeenCalledWith('reminder-task', '2026-07-21T02:00:05.000Z');
     expect(onChanged).toHaveBeenCalledOnce();
 
     notificationMock.instances[0].handlers.get('click')?.();
     expect(onOpenTask).toHaveBeenCalledOnce();
+  });
+
+  it('can keep reminder notifications visible until the user closes them', async () => {
+    const tasks = [task('2026-07-21T02:00:01.000Z')];
+    const store = {
+      getSnapshot: () => ({ tasks, settings: { notificationTimeoutType: 'never' } }),
+      markReminderNotified: vi.fn(async () => ({ tasks })),
+    };
+    const scheduler = new ReminderScheduler(store as never, vi.fn(), vi.fn());
+
+    scheduler.scheduleAll();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(notificationMock.instances[0].options.timeoutType).toBe('never');
   });
 
   it('reschedules after an edited reminder time and does not fire the old timer', async () => {

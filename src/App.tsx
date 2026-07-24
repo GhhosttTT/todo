@@ -521,6 +521,19 @@ function App() {
           </section>
 
           <section>
+            <h3><Clock3 size={17} />提醒停留</h3>
+            <div className="theme-segmented" aria-label="提醒停留时长">
+              <button className={snapshot.settings.notificationTimeoutType === 'default' ? 'active' : ''} onClick={() => void changeSettings({ notificationTimeoutType: 'default' })}>
+                系统默认
+              </button>
+              <button className={snapshot.settings.notificationTimeoutType === 'never' ? 'active' : ''} onClick={() => void changeSettings({ notificationTimeoutType: 'never' })}>
+                手动关闭
+              </button>
+            </div>
+            <p className="shortcut-help">手动关闭会让系统提醒保持悬浮，直到用户关闭通知。</p>
+          </section>
+
+          <section>
             <h3><Keyboard size={17} />全局快捷键</h3>
             <div className={`shortcut-control ${shortcutRecording ? 'is-recording' : ''}`}>
               <input

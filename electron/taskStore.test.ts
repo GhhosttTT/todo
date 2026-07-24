@@ -54,6 +54,15 @@ describe('TaskStore', () => {
     expect(new TaskStore(store.stateFile).load().settings.theme).toBe('dark');
   });
 
+  it('persists reminder notification timeout preference', async () => {
+    const store = createStore();
+    const loaded = store.load();
+
+    await store.updateSettings(loaded.revision, { notificationTimeoutType: 'never' });
+
+    expect(new TaskStore(store.stateFile).load().settings.notificationTimeoutType).toBe('never');
+  });
+
   it('persists mutations and reloads them', async () => {
     const store = createStore();
     store.load();

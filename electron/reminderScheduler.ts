@@ -39,7 +39,8 @@ export class ReminderScheduler {
 
   private async fire(id: string, remindAt: string): Promise<void> {
     this.timers.delete(id);
-    const task = this.store.getSnapshot().tasks.find((item) => item.id === id);
+    const snapshot = this.store.getSnapshot();
+    const task = snapshot.tasks.find((item) => item.id === id);
     if (!task || !shouldScheduleReminder(task) || task.remindAt !== remindAt) return;
 
     const dueAt = Date.parse(task.remindAt);
@@ -55,6 +56,7 @@ export class ReminderScheduler {
       body: task.notes ? `${task.title}\n${task.notes.slice(0, 120)}` : task.title,
       icon: this.icon,
       silent: false,
+      timeoutType: snapshot.settings?.notificationTimeoutType ?? 'default',
     });
     notification.on('click', this.onOpenTask);
     notification.show();
