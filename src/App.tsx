@@ -451,7 +451,7 @@ function App() {
           {editing && view !== 'completed' && <button className="icon-button add-button" onClick={openComposer} title="添加任务"><Plus size={24} /></button>}
         </header>
 
-        <section className="task-scroll" aria-live="polite">
+        <section className={`task-scroll ${showCompletedSplit ? 'split-scroll' : ''}`} aria-live="polite">
           {composerOpen && (
             <div className="composer">
               <span className="completion-ring idle" />
