@@ -6,11 +6,13 @@ const notificationMock = vi.hoisted(() => {
     options: { title: string; body: string; timeoutType?: 'default' | 'never' };
     handlers: Map<string, () => void>;
     show: ReturnType<typeof vi.fn>;
+    close: ReturnType<typeof vi.fn>;
   }> = [];
 
   class MockNotification {
     handlers = new Map<string, () => void>();
     show = vi.fn();
+    close = vi.fn(() => this.handlers.get('close')?.());
 
     constructor(public options: { title: string; body: string; timeoutType?: 'default' | 'never' }) {
       instances.push(this);
@@ -97,7 +99,10 @@ describe('ReminderScheduler', () => {
     const tasks = [task('2026-07-21T02:00:01.000Z')];
     const store = {
       getSnapshot: () => ({ tasks, settings: { notificationTimeoutType: 'never' } }),
-      markReminderNotified: vi.fn(async () => ({ tasks })),
+      markReminderNotified: vi.fn(async () => {
+        tasks[0].notifiedAt = new Date().toISOString();
+        return { tasks };
+      }),
     };
     const scheduler = new ReminderScheduler(store as never, vi.fn(), vi.fn());
 
@@ -105,6 +110,27 @@ describe('ReminderScheduler', () => {
     await vi.advanceTimersByTimeAsync(1_000);
 
     expect(notificationMock.instances[0].options.timeoutType).toBe('never');
+  });
+
+  it('can close reminder notifications after a custom duration', async () => {
+    const tasks = [task('2026-07-21T02:00:01.000Z')];
+    const store = {
+      getSnapshot: () => ({ tasks, settings: { notificationTimeoutType: 'custom', notificationDurationSeconds: 5 } }),
+      markReminderNotified: vi.fn(async () => {
+        tasks[0].notifiedAt = new Date().toISOString();
+        return { tasks };
+      }),
+    };
+    const scheduler = new ReminderScheduler(store as never, vi.fn(), vi.fn());
+
+    scheduler.scheduleAll();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(notificationMock.instances[0].options.timeoutType).toBe('never');
+    expect(notificationMock.instances[0].close).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(notificationMock.instances[0].close).toHaveBeenCalledOnce();
   });
 
   it('reschedules after an edited reminder time and does not fire the old timer', async () => {

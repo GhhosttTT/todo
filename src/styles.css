@@ -384,6 +384,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .settings-drawer section { padding: 18px 0; border-top: 1px solid #e0e3e7; }
 .settings-drawer h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; }
 .theme-segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 7px; background: #e7eaee; }
+.theme-segmented.triple { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .theme-segmented button { height: 34px; display: flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 5px; color: #747b85; background: transparent; cursor: pointer; }
 .theme-segmented button.active { color: #242932; background: white; box-shadow: 0 1px 4px rgba(31, 37, 47, .12); }
 .shortcut-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
@@ -407,6 +408,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .toggle-row input { width: 35px; height: 19px; accent-color: var(--blue); }
 .range-row { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 10px; }
 .range-row input { width: 100%; accent-color: var(--blue); }
+.compact-range { margin-top: 12px; }
+.compact-range span { display: flex; justify-content: space-between; color: #59606b; font-size: 11px; font-weight: 700; }
 
 .app-shell.layout-compact {
   grid-template-columns: 1fr;

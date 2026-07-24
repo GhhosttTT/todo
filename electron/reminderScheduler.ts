@@ -10,6 +10,7 @@ function shouldScheduleReminder(task: Task): task is Task & { remindAt: string }
 
 export class ReminderScheduler {
   private timers = new Map<string, NodeJS.Timeout>();
+  private activeNotifications = new Set<Notification>();
 
   constructor(
     private readonly store: TaskStore,
@@ -51,15 +52,25 @@ export class ReminderScheduler {
 
     if (!Notification.isSupported()) return;
 
+    const timeoutType = snapshot.settings?.notificationTimeoutType ?? 'default';
     const notification = new Notification({
       title: 'Todo 提醒',
       body: task.notes ? `${task.title}\n${task.notes.slice(0, 120)}` : task.title,
       icon: this.icon,
       silent: false,
-      timeoutType: snapshot.settings?.notificationTimeoutType ?? 'default',
+      timeoutType: timeoutType === 'default' ? 'default' : 'never',
     });
     notification.on('click', this.onOpenTask);
+    notification.on('close', () => this.activeNotifications.delete(notification));
     notification.show();
+    this.activeNotifications.add(notification);
+    if (timeoutType === 'custom') {
+      const seconds = Math.min(300, Math.max(3, snapshot.settings?.notificationDurationSeconds ?? 12));
+      setTimeout(() => {
+        notification.close();
+        this.activeNotifications.delete(notification);
+      }, seconds * 1000);
+    }
 
     await this.store.markReminderNotified(task.id, task.remindAt);
     this.onChanged();
