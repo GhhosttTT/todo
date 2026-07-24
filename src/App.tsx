@@ -140,6 +140,18 @@ function App() {
     query,
     today: todayKey,
   }) : [], [query, snapshot, todayKey, view]);
+  const openTasksForCompletedView = useMemo(() => snapshot ? filterTasks(snapshot.tasks, {
+    view: 'all',
+    showCompleted: false,
+    query,
+    today: todayKey,
+  }) : [], [query, snapshot, todayKey]);
+  const showCompletedSplit = Boolean(
+    snapshot
+      && view === 'completed'
+      && snapshot.settings.layoutMode === 'expanded'
+      && snapshot.settings.showOpenTasksInCompletedView,
+  );
 
   useEffect(() => {
     if (editing) return;
@@ -333,6 +345,51 @@ function App() {
     || snapshot.runtime.shortcutError
     || snapshot.runtime.persistenceError;
 
+  const renderTaskRow = (task: Task) => (
+    <article
+      key={task.id}
+      className={`task-row ${task.completedAt ? 'completed' : ''} ${editingId === task.id ? 'expanded' : ''}`}
+      draggable={editing && editingId !== task.id}
+      onDragStart={() => setDraggedId(task.id)}
+      onDragOver={(event) => editing && event.preventDefault()}
+      onDrop={() => void dropOn(task.id)}
+    >
+      {editing && <span className="drag-handle" title="拖动排序"><GripVertical size={16} /></span>}
+      <button className="completion-button" disabled={!editing} onClick={() => void toggleCompleted(task)} title={task.completedAt ? '恢复任务' : '完成任务'}>
+        {task.completedAt && <Check size={13} strokeWidth={3} />}
+      </button>
+
+      {editingId === task.id ? (
+        <div className="task-editor">
+          <input autoFocus className="title-input" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} maxLength={300} />
+          <textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="备注（可选）" maxLength={10000} />
+          <div className="editor-footer">
+            <label><CalendarDays size={15} /><input type="date" value={draft.dueDate} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value })} /></label>
+            <label><Clock3 size={15} /><input type="datetime-local" value={draft.remindAt} onChange={(event) => setDraft({ ...draft, remindAt: event.target.value })} /></label>
+            <button className="danger-icon" onClick={() => void deleteTask(task.id)} title="删除任务"><Trash2 size={16} /></button>
+            <button className="text-button" onClick={() => setEditingId(null)}>取消</button>
+            <button className="text-button primary" disabled={!draft.title.trim()} onClick={() => void saveTask()}>保存</button>
+          </div>
+        </div>
+      ) : (
+        <button className="task-content" disabled={!editing} onClick={() => beginEdit(task)}>
+          <span className="task-title">{task.title}</span>
+          {(task.notes || task.dueDate || task.remindAt) && (
+            <span className="task-meta">
+              {task.notes && <span className="task-notes">{task.notes}</span>}
+              {(task.dueDate || task.remindAt) && (
+                <span className="task-timing-row">
+                  {task.dueDate && <span className={task.dueDate < todayKey && !task.completedAt ? 'overdue' : ''}><CalendarDays size={13} />{task.dueDate}</span>}
+                  {task.remindAt && <span><Clock3 size={13} />{formatReminder(task.remindAt)}</span>}
+                </span>
+              )}
+            </span>
+          )}
+        </button>
+      )}
+    </article>
+  );
+
   return (
     <div
       className={`app-shell theme-${snapshot.settings.theme} layout-${snapshot.settings.layoutMode} ${editing ? 'is-editing' : 'is-viewing'}`}
@@ -412,7 +469,7 @@ function App() {
             </div>
           )}
 
-          {visibleTasks.length === 0 && !composerOpen ? (
+          {!showCompletedSplit && visibleTasks.length === 0 && !composerOpen ? (
             <div className="empty-state">
               <span className={`empty-icon ${meta.tone}`}><Icon size={26} /></span>
               <h2>{query ? '没有匹配的任务' : 'No Reminders'}</h2>
@@ -420,52 +477,26 @@ function App() {
               {editing && !query && view !== 'completed' && <button className="empty-add" onClick={openComposer}><CirclePlus size={17} />添加任务</button>}
             </div>
           ) : (
-            <div className="task-list">
-              {visibleTasks.map((task) => (
-                <article
-                  key={task.id}
-                  className={`task-row ${task.completedAt ? 'completed' : ''} ${editingId === task.id ? 'expanded' : ''}`}
-                  draggable={editing && editingId !== task.id}
-                  onDragStart={() => setDraggedId(task.id)}
-                  onDragOver={(event) => editing && event.preventDefault()}
-                  onDrop={() => void dropOn(task.id)}
-                >
-                  {editing && <span className="drag-handle" title="拖动排序"><GripVertical size={16} /></span>}
-                  <button className="completion-button" disabled={!editing} onClick={() => void toggleCompleted(task)} title={task.completedAt ? '恢复任务' : '完成任务'}>
-                    {task.completedAt && <Check size={13} strokeWidth={3} />}
-                  </button>
-
-                  {editingId === task.id ? (
-                    <div className="task-editor">
-                      <input autoFocus className="title-input" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} maxLength={300} />
-                      <textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="备注（可选）" maxLength={10000} />
-                      <div className="editor-footer">
-                        <label><CalendarDays size={15} /><input type="date" value={draft.dueDate} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value })} /></label>
-                        <label><Clock3 size={15} /><input type="datetime-local" value={draft.remindAt} onChange={(event) => setDraft({ ...draft, remindAt: event.target.value })} /></label>
-                        <button className="danger-icon" onClick={() => void deleteTask(task.id)} title="删除任务"><Trash2 size={16} /></button>
-                        <button className="text-button" onClick={() => setEditingId(null)}>取消</button>
-                        <button className="text-button primary" disabled={!draft.title.trim()} onClick={() => void saveTask()}>保存</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button className="task-content" disabled={!editing} onClick={() => beginEdit(task)}>
-                      <span className="task-title">{task.title}</span>
-                      {(task.notes || task.dueDate || task.remindAt) && (
-                        <span className="task-meta">
-                          {task.notes && <span className="task-notes">{task.notes}</span>}
-                          {(task.dueDate || task.remindAt) && (
-                            <span className="task-timing-row">
-                              {task.dueDate && <span className={task.dueDate < todayKey && !task.completedAt ? 'overdue' : ''}><CalendarDays size={13} />{task.dueDate}</span>}
-                              {task.remindAt && <span><Clock3 size={13} />{formatReminder(task.remindAt)}</span>}
-                            </span>
-                          )}
-                        </span>
-                      )}
-                    </button>
-                  )}
-                </article>
-              ))}
-            </div>
+            showCompletedSplit ? (
+              <div className="task-split-view">
+                <section className="task-panel">
+                  <header><span>待完成</span><strong>{openTasksForCompletedView.length}</strong></header>
+                  <div className="task-list">
+                    {openTasksForCompletedView.length ? openTasksForCompletedView.map(renderTaskRow) : <div className="panel-empty">没有待完成任务</div>}
+                  </div>
+                </section>
+                <section className="task-panel completed-panel">
+                  <header><span>已完成</span><strong>{visibleTasks.length}</strong></header>
+                  <div className="task-list">
+                    {visibleTasks.length ? visibleTasks.map(renderTaskRow) : <div className="panel-empty">还没有完成记录</div>}
+                  </div>
+                </section>
+              </div>
+            ) : (
+              <div className="task-list">
+                {visibleTasks.map(renderTaskRow)}
+              </div>
+            )
           )}
         </section>
       </main>
@@ -590,6 +621,10 @@ function App() {
             <label className="toggle-row">
               <span><strong>显示已完成</strong><small>在当前视图中保留完成项</small></span>
               <input type="checkbox" checked={snapshot.settings.showCompleted} onChange={(event) => void changeSettings({ showCompleted: event.target.checked })} />
+            </label>
+            <label className="toggle-row">
+              <span><strong>Done 显示待完成栏</strong><small>横屏 Done 视图左侧展示未完成任务</small></span>
+              <input type="checkbox" checked={snapshot.settings.showOpenTasksInCompletedView} onChange={(event) => void changeSettings({ showOpenTasksInCompletedView: event.target.checked })} />
             </label>
             <label className="range-row"><span>窗口透明度</span><input type="range" min="0.72" max="1" step="0.01" value={snapshot.settings.opacity} onChange={(event) => void changeSettings({ opacity: Number(event.target.value) })} /></label>
             <label className="range-row"><span>背景强度</span><input type="range" min="0" max="1" step="0.05" value={snapshot.settings.backgroundIntensity} onChange={(event) => void changeSettings({ backgroundIntensity: Number(event.target.value) })} /></label>

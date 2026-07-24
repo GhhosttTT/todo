@@ -66,6 +66,15 @@ describe('TaskStore', () => {
     });
   });
 
+  it('persists whether Done view shows the open-task column', async () => {
+    const store = createStore();
+    const loaded = store.load();
+
+    await store.updateSettings(loaded.revision, { showOpenTasksInCompletedView: false });
+
+    expect(new TaskStore(store.stateFile).load().settings.showOpenTasksInCompletedView).toBe(false);
+  });
+
   it('persists mutations and reloads them', async () => {
     const store = createStore();
     store.load();
