@@ -1,4 +1,4 @@
-export type ViewId = 'today' | 'scheduled' | 'all';
+export type ViewId = 'today' | 'scheduled' | 'all' | 'completed';
 export type DataMode = 'normal' | 'portable';
 export type Theme = 'light' | 'dark';
 export type LayoutMode = 'expanded' | 'compact';

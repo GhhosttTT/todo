@@ -89,7 +89,7 @@ function defaultState(): PersistedState {
 }
 
 function isViewId(value: unknown): value is ViewId {
-  return value === 'today' || value === 'scheduled' || value === 'all';
+  return value === 'today' || value === 'scheduled' || value === 'all' || value === 'completed';
 }
 
 function isLayoutMode(value: unknown): value is LayoutMode {

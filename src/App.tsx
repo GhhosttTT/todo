@@ -31,6 +31,7 @@ const viewMeta = {
   today: { label: 'Today', hint: '今天与逾期', icon: CalendarDays, tone: 'blue' },
   scheduled: { label: 'Scheduled', hint: '未来计划', icon: Layers3, tone: 'coral' },
   all: { label: 'All', hint: '全部任务', icon: Inbox, tone: 'graphite' },
+  completed: { label: 'Done', hint: '完成记录', icon: Check, tone: 'green' },
 } as const;
 
 interface DraftTask {
@@ -390,7 +391,7 @@ function App() {
             <h1 className={meta.tone}>{meta.label}</h1>
             <p>{meta.hint}</p>
           </div>
-          {editing && <button className="icon-button add-button" onClick={openComposer} title="添加任务"><Plus size={24} /></button>}
+          {editing && view !== 'completed' && <button className="icon-button add-button" onClick={openComposer} title="添加任务"><Plus size={24} /></button>}
         </header>
 
         <section className="task-scroll" aria-live="polite">
@@ -415,8 +416,8 @@ function App() {
             <div className="empty-state">
               <span className={`empty-icon ${meta.tone}`}><Icon size={26} /></span>
               <h2>{query ? '没有匹配的任务' : 'No Reminders'}</h2>
-              <p>{query ? '换一个关键词试试。' : view === 'today' ? '今天没有需要处理的事项。' : view === 'scheduled' ? '未来还没有安排任务。' : '这里会显示你的全部任务。'}</p>
-              {editing && !query && <button className="empty-add" onClick={openComposer}><CirclePlus size={17} />添加任务</button>}
+              <p>{query ? '换一个关键词试试。' : view === 'today' ? '今天没有需要处理的事项。' : view === 'scheduled' ? '未来还没有安排任务。' : view === 'completed' ? '完成任务后会在这里留下记录。' : '这里会显示你的全部任务。'}</p>
+              {editing && !query && view !== 'completed' && <button className="empty-add" onClick={openComposer}><CirclePlus size={17} />添加任务</button>}
             </div>
           ) : (
             <div className="task-list">

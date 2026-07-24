@@ -21,6 +21,7 @@ const tasks = [
   task('future', '2026-07-14'),
   task('none', null),
   task('done', '2026-07-13', true),
+  { ...task('done-later', null, true), completedAt: '2026-07-13T12:00:00.000Z' },
   task('notes', null),
 ];
 
@@ -41,7 +42,12 @@ describe('fixed task views', () => {
   });
 
   it('counts only active tasks', () => {
-    expect(getViewCounts(tasks, '2026-07-13')).toEqual({ today: 2, scheduled: 1, all: 5 });
+    expect(getViewCounts(tasks, '2026-07-13')).toEqual({ today: 2, scheduled: 1, all: 5, completed: 2 });
+  });
+
+  it('shows completed tasks in Done even when completed items are hidden elsewhere', () => {
+    expect(filterTasks(tasks, { view: 'completed', showCompleted: false, today: '2026-07-13' }).map(({ id }) => id))
+      .toEqual(['done-later', 'done']);
   });
 
   it('prioritizes overdue and today tasks at the top of All', () => {

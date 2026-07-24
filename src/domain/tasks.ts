@@ -14,6 +14,7 @@ export function isValidDateKey(value: string | null): boolean {
 }
 
 export function taskMatchesView(task: Task, view: ViewId, today = localDateKey()): boolean {
+  if (view === 'completed') return Boolean(task.completedAt);
   if (view === 'all') return true;
   if (!task.dueDate) return false;
   if (view === 'today') return task.dueDate <= today;
@@ -32,6 +33,10 @@ function allViewDateRank(task: Task, today: string): number {
 }
 
 function compareTasksForView(a: Task, b: Task, view: ViewId, today: string): number {
+  if (view === 'completed') {
+    const completedDelta = (Date.parse(b.completedAt ?? '') || 0) - (Date.parse(a.completedAt ?? '') || 0);
+    if (completedDelta !== 0) return completedDelta;
+  }
   if (view === 'all') {
     if (Boolean(a.completedAt) !== Boolean(b.completedAt)) return a.completedAt ? 1 : -1;
     const rankDelta = allViewDateRank(a, today) - allViewDateRank(b, today);
@@ -49,7 +54,7 @@ export function filterTasks(
 
   return tasks
     .filter((task) => taskMatchesView(task, options.view, today))
-    .filter((task) => options.showCompleted || !task.completedAt)
+    .filter((task) => options.view === 'completed' || options.showCompleted || !task.completedAt)
     .filter((task) => {
       if (!query) return true;
       return task.title.toLocaleLowerCase().includes(query) || task.notes.toLocaleLowerCase().includes(query);
@@ -63,6 +68,7 @@ export function getViewCounts(tasks: Task[], today = localDateKey()): Record<Vie
     today: active.filter((task) => taskMatchesView(task, 'today', today)).length,
     scheduled: active.filter((task) => taskMatchesView(task, 'scheduled', today)).length,
     all: active.length,
+    completed: tasks.filter((task) => task.completedAt).length,
   };
 }
 
