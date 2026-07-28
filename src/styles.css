@@ -386,7 +386,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 }
 .task-content:not(:disabled) { cursor: text; }
 .task-title { overflow-wrap: anywhere; font-size: 14px; line-height: 1.45; }
-.completed .task-title { color: #989da5; text-decoration: line-through; }
+.completed .task-title { color: #6e7480; text-decoration: line-through; text-decoration-thickness: 1px; text-decoration-color: rgba(110, 116, 128, .42); }
+.completed .task-meta { color: #9298a2; }
 .task-meta { min-width: 0; display: grid; gap: 4px; color: #8d929b; font-size: 11px; }
 .task-meta .task-notes { overflow-wrap: anywhere; white-space: normal; }
 .task-timing-row { min-width: 0; display: flex; align-items: center; gap: 12px; white-space: nowrap; }
@@ -635,7 +636,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .theme-dark .drag-handle { color: #5d646e; }
 .theme-dark .completion-button, .theme-dark .completion-ring { border-color: #6d747e; }
 .theme-dark .completed .completion-button { border-color: var(--blue); }
-.theme-dark .completed .task-title { color: #666d77; }
+.theme-dark .completed .task-title { color: #a0a7b0; text-decoration-color: rgba(160, 167, 176, .46); }
+.theme-dark .completed .task-meta { color: #838b96; }
 .theme-dark .task-meta { color: #858c96; }
 .theme-dark .task-panel header { color: #8f969f; }
 .theme-dark .task-panel header strong { color: #858c96; }
