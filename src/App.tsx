@@ -603,6 +603,8 @@ function App() {
           {notice.undoToken && <button onClick={() => void undoDelete()}><RotateCcw size={15} />撤销</button>}
         </div>
       )}
+
+      {editing && <div className="resize-grip" aria-hidden="true" />}
     </div>
   );
 }

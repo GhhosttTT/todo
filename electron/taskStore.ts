@@ -12,7 +12,7 @@ import {
 import { dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { applyVisibleOrder, isValidDateKey } from '../src/domain/tasks';
-import { dimensionsForLayout } from '../src/domain/layout';
+import { dimensionsForLayout, minDimensionsForLayout } from '../src/domain/layout';
 import type { LayoutMode, NotificationTimeoutType, Settings, Task, ViewId, WindowBounds } from '../src/types';
 
 const SCHEMA_VERSION = 3;
@@ -112,10 +112,14 @@ function finiteNumber(value: unknown, fallback: number): number {
 function parseWindowBounds(value: unknown, fallback: WindowBounds, layoutMode: LayoutMode): WindowBounds {
   const bounds = value && typeof value === 'object' ? value as Record<string, unknown> : {};
   const dimensions = dimensionsForLayout(layoutMode);
+  const minimum = minDimensionsForLayout(layoutMode);
+  const width = Math.max(minimum.width, finiteNumber(bounds.width, dimensions.width));
+  const height = Math.max(minimum.height, finiteNumber(bounds.height, dimensions.height));
   return {
     x: finiteNumber(bounds.x, fallback.x),
     y: finiteNumber(bounds.y, fallback.y),
-    ...dimensions,
+    width,
+    height,
     displayId: typeof bounds.displayId === 'string' ? bounds.displayId : undefined,
     scaleFactor: finiteNumber(bounds.scaleFactor, fallback.scaleFactor ?? 1),
   };
