@@ -76,6 +76,12 @@ export class WindowController {
     return safe;
   }
 
+  ensureVisible(): Electron.Rectangle {
+    const safe = this.safeBounds(this.currentBounds());
+    this.window.setBounds(safe, true);
+    return safe;
+  }
+
   currentBounds(): WindowBounds {
     const bounds = this.window.getBounds();
     const display = screen.getDisplayMatching(bounds);
@@ -127,6 +133,7 @@ export class WindowController {
     this.window.setAlwaysOnTop(false);
     this.window.setResizable(false);
     this.window.setSkipTaskbar(true);
+    this.ensureVisible();
     this.window.showInactive();
     const status = this.desktopLayer.bind(this.window);
     if (generation !== this.generation) return;

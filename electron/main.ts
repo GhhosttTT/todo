@@ -312,9 +312,16 @@ if (hasSingleInstanceLock) {
     await createWindow();
 
     app.on('second-instance', () => { void controller?.setEditing(true); });
-    screen.on('display-added', () => { if (runtime.windowMode !== 'editing') void controller?.startViewing(); });
-    screen.on('display-removed', () => { if (runtime.windowMode !== 'editing') void controller?.startViewing(); });
-    screen.on('display-metrics-changed', () => { if (runtime.windowMode !== 'editing') void controller?.startViewing(); });
+    const handleDisplayChanged = () => {
+      if (runtime.windowMode === 'editing' || runtime.windowMode === 'entering-editing') {
+        controller?.ensureVisible();
+        return;
+      }
+      void controller?.startViewing();
+    };
+    screen.on('display-added', handleDisplayChanged);
+    screen.on('display-removed', handleDisplayChanged);
+    screen.on('display-metrics-changed', handleDisplayChanged);
   }).catch((error) => {
     console.error(error);
     app.quit();
