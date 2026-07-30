@@ -21,7 +21,7 @@ describe('TaskStore', () => {
     expect(store.load().settings.selectedView).toBe('all');
   });
 
-  it('normalizes legacy bounds to the fixed expanded layout size', () => {
+  it('preserves custom expanded bounds when they are usable', () => {
     const store = createStore();
     writeFileSync(store.stateFile, JSON.stringify({
       schemaVersion: 2,
@@ -30,20 +30,33 @@ describe('TaskStore', () => {
       settings: { windowBounds: { x: 10, y: 20, width: 760, height: 1200 } },
     }), 'utf8');
 
-    expect(store.load().settings.windowBounds).toMatchObject({ x: 10, y: 20, width: 900, height: 620 });
+    expect(store.load().settings.windowBounds).toMatchObject({ x: 10, y: 20, width: 760, height: 1200 });
   });
 
-  it('persists compact mode with a separate fixed-size window position', async () => {
+  it('clamps undersized compact bounds while keeping separate layout state', async () => {
     const store = createStore();
     const loaded = store.load();
     const changed = await store.updateSettings(loaded.revision, {
       layoutMode: 'compact',
-      compactWindowBounds: { x: 1320, y: 180, width: 999, height: 999 },
+      compactWindowBounds: { x: 1320, y: 180, width: 120, height: 240 },
     });
 
     expect(changed.settings.layoutMode).toBe('compact');
-    expect(changed.settings.compactWindowBounds).toMatchObject({ x: 1320, y: 180, width: 400, height: 620 });
-    expect(new TaskStore(store.stateFile).load().settings.compactWindowBounds).toMatchObject({ x: 1320, y: 180, width: 400, height: 620 });
+    expect(changed.settings.compactWindowBounds).toMatchObject({ x: 1320, y: 180, width: 360, height: 480 });
+    expect(new TaskStore(store.stateFile).load().settings.compactWindowBounds).toMatchObject({ x: 1320, y: 180, width: 360, height: 480 });
+  });
+
+  it('persists resized compact bounds independently from expanded bounds', async () => {
+    const store = createStore();
+    const loaded = store.load();
+    const changed = await store.updateSettings(loaded.revision, {
+      layoutMode: 'compact',
+      compactWindowBounds: { x: 1320, y: 180, width: 460, height: 700 },
+    });
+
+    expect(changed.settings.compactWindowBounds).toMatchObject({ x: 1320, y: 180, width: 460, height: 700 });
+    expect(changed.settings.windowBounds).toMatchObject({ width: 900, height: 620 });
+    expect(new TaskStore(store.stateFile).load().settings.compactWindowBounds).toMatchObject({ x: 1320, y: 180, width: 460, height: 700 });
   });
 
   it('uses light theme by default and persists a dark theme choice', async () => {

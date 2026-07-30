@@ -97,6 +97,21 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   isolation: isolate;
 }
 
+.resize-grip {
+  position: absolute;
+  z-index: 24;
+  right: 7px;
+  bottom: 7px;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  opacity: .42;
+  background:
+    linear-gradient(135deg, transparent 0 52%, rgba(91, 98, 110, .9) 53% 57%, transparent 58%),
+    linear-gradient(135deg, transparent 0 68%, rgba(91, 98, 110, .75) 69% 73%, transparent 74%),
+    linear-gradient(135deg, transparent 0 84%, rgba(91, 98, 110, .58) 85% 89%, transparent 90%);
+}
+
 .sidebar {
   position: relative;
   z-index: 1;
@@ -663,6 +678,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .theme-dark .shortcut-help { color: #7f8690; }
 .theme-dark .status-line { color: #969da6; }
 .theme-dark .settings-drawer code { color: #b9bec5; background: #101215; }
+.theme-dark .resize-grip {
+  opacity: .5;
+  background:
+    linear-gradient(135deg, transparent 0 52%, rgba(205, 211, 220, .8) 53% 57%, transparent 58%),
+    linear-gradient(135deg, transparent 0 68%, rgba(205, 211, 220, .66) 69% 73%, transparent 74%),
+    linear-gradient(135deg, transparent 0 84%, rgba(205, 211, 220, .5) 85% 89%, transparent 90%);
+}
 .theme-dark .toggle-row small { color: #7f8690; }
 .theme-dark input[type='range'] { color-scheme: dark; }
 

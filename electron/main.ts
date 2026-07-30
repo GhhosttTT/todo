@@ -3,13 +3,12 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AppSnapshot, RuntimeStatus } from '../src/types';
-import { dimensionsForLayout } from '../src/domain/layout';
 import { DesktopLayer } from './desktopLayer';
 import { clearIpcHandlers, registerIpcHandlers } from './ipc';
 import { ReminderScheduler } from './reminderScheduler';
 import { resolveHostExecutablePath, resolvePathsFromEnvironment } from './runtimePaths';
 import { TaskStore } from './taskStore';
-import { FIXED_WINDOW_HEIGHT, MINIMUM_WINDOW_WIDTH, WindowController } from './windowController';
+import { DEFAULT_WINDOW_HEIGHT, MINIMUM_WINDOW_HEIGHT, MINIMUM_WINDOW_WIDTH, WindowController } from './windowController';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const hostExecutablePath = resolveHostExecutablePath(
@@ -164,6 +163,18 @@ function createTray(): void {
   tray.on('click', () => { void controller?.toggleEditing(); });
 }
 
+async function persistCurrentBounds(): Promise<void> {
+  if (!controller || !mainWindow) return;
+  if (boundsSaveTimer) {
+    clearTimeout(boundsSaveTimer);
+    boundsSaveTimer = undefined;
+  }
+  const current = store.getSnapshot();
+  const boundsKey = current.settings.layoutMode === 'compact' ? 'compactWindowBounds' : 'windowBounds';
+  await store.updateSettings(current.revision, { [boundsKey]: controller.currentBounds() });
+  broadcastSnapshot();
+}
+
 async function createWindow(): Promise<void> {
   const loaded = store.load();
   const initialBounds = loaded.settings.layoutMode === 'compact'
@@ -183,9 +194,8 @@ async function createWindow(): Promise<void> {
   mainWindow = new BrowserWindow({
     ...initialBounds,
     minWidth: MINIMUM_WINDOW_WIDTH,
-    height: FIXED_WINDOW_HEIGHT,
-    minHeight: FIXED_WINDOW_HEIGHT,
-    maxHeight: FIXED_WINDOW_HEIGHT,
+    minHeight: MINIMUM_WINDOW_HEIGHT,
+    height: initialBounds.height || DEFAULT_WINDOW_HEIGHT,
     resizable: false,
     frame: false,
     transparent: true,
@@ -203,9 +213,17 @@ async function createWindow(): Promise<void> {
     },
   });
   mainWindow.setOpacity(loaded.settings.opacity);
-  controller = new WindowController(mainWindow, desktopLayer, runtime, broadcastRuntime);
+  controller = new WindowController(mainWindow, desktopLayer, runtime, broadcastRuntime, loaded.settings.layoutMode, async () => {
+    try {
+      await persistCurrentBounds();
+    } catch (error) {
+      runtime.persistenceError = error instanceof Error ? error.message : '窗口位置保存失败。';
+      runtime.hasUnpersistedChanges = true;
+      broadcastRuntime();
+    }
+  });
   reminders = new ReminderScheduler(store, broadcastSnapshot, () => { void controller?.setEditing(true); }, loadIcon(64));
-  mainWindow.setBounds(controller.safeBounds(initialBounds));
+  mainWindow.setBounds(controller.safeBounds(initialBounds, loaded.settings.layoutMode));
 
   registerIpcHandlers({
     store,
@@ -217,7 +235,7 @@ async function createWindow(): Promise<void> {
     applyLaunchAtLogin,
     applyLayoutMode: (settings) => {
       const bounds = settings.layoutMode === 'compact' ? settings.compactWindowBounds : settings.windowBounds;
-      controller?.applyLayoutBounds({ ...bounds, ...dimensionsForLayout(settings.layoutMode) });
+      controller?.applyLayoutBounds(bounds, settings.layoutMode);
     },
     onStoreChanged: () => reminders?.scheduleAll(),
     transientSettings: captureTheme ? { theme: captureTheme } : undefined,
@@ -237,12 +255,8 @@ async function createWindow(): Promise<void> {
     if (!controller || !mainWindow || runtime.windowMode !== 'editing') return;
     if (boundsSaveTimer) clearTimeout(boundsSaveTimer);
     boundsSaveTimer = setTimeout(async () => {
-      if (!controller) return;
       try {
-        const current = store.getSnapshot();
-        const boundsKey = current.settings.layoutMode === 'compact' ? 'compactWindowBounds' : 'windowBounds';
-        await store.updateSettings(current.revision, { [boundsKey]: controller.currentBounds() });
-        broadcastSnapshot();
+        await persistCurrentBounds();
       } catch (error) {
         runtime.persistenceError = error instanceof Error ? error.message : '窗口位置保存失败。';
         runtime.hasUnpersistedChanges = true;
@@ -259,10 +273,10 @@ async function createWindow(): Promise<void> {
   if (!app.isPackaged && capturePath) {
     if (!captureViewMode) await controller.setEditing(true);
     if (captureSize && /^\d+x\d+$/.test(captureSize)) {
-      const [width] = captureSize.split('x').map(Number);
+      const [width, height] = captureSize.split('x').map(Number);
       const bounds = mainWindow.getBounds();
-      mainWindow.setBounds({ ...bounds, width: Math.max(MINIMUM_WINDOW_WIDTH, width), height: FIXED_WINDOW_HEIGHT }, false);
-      mainWindow.setContentSize(Math.max(MINIMUM_WINDOW_WIDTH, width), FIXED_WINDOW_HEIGHT, false);
+      mainWindow.setBounds({ ...bounds, width: Math.max(MINIMUM_WINDOW_WIDTH, width), height: Math.max(MINIMUM_WINDOW_HEIGHT, height) }, false);
+      mainWindow.setContentSize(Math.max(MINIMUM_WINDOW_WIDTH, width), Math.max(MINIMUM_WINDOW_HEIGHT, height), false);
     }
     if (captureSettings) {
       await mainWindow.webContents.executeJavaScript(`new Promise((resolve) => {
