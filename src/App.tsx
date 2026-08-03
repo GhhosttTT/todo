@@ -54,6 +54,17 @@ function formatReminder(value: string): string {
   return Number.isFinite(date.getTime()) ? format(date, 'yyyy-MM-dd HH:mm') : value;
 }
 
+function formatAgendaTime(value: string | null): string {
+  if (!value) return '全天';
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? format(date, 'HH:mm') : '全天';
+}
+
+function dateFromKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
 function taskCalendarDate(task: Task): string | null {
   if (task.remindAt) {
     const date = new Date(task.remindAt);
@@ -139,8 +150,18 @@ function App() {
   const calendarRangeDays = snapshot?.settings.calendarRangeDays ?? 7;
   const calendarDays = useMemo(() => Array.from({ length: calendarRangeDays }, (_, index) => {
     const date = addDays(new Date(), index);
-    return { key: format(date, 'yyyy-MM-dd'), day: format(date, 'dd'), week: format(date, 'EEE') };
+    return { key: format(date, 'yyyy-MM-dd'), day: format(date, 'dd'), week: format(date, 'EEE'), month: format(date, 'MMM') };
   }), [calendarRangeDays, todayKey]);
+  const dateCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    snapshot?.tasks.forEach((task) => {
+      if (task.completedAt) return;
+      const key = taskCalendarDate(task);
+      if (!key) return;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    return counts;
+  }, [snapshot]);
   const visibleTasks = useMemo(() => {
     if (!snapshot) return [];
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -156,10 +177,9 @@ function App() {
         return left.sortOrder - right.sortOrder || left.createdAt.localeCompare(right.createdAt);
       });
   }, [query, selectedDate, snapshot]);
-  const selectedDateLabel = useMemo(() => {
-    const [year, month, day] = selectedDate.split('-').map(Number);
-    return format(new Date(year, month - 1, day), 'yyyy年 MM月dd日');
-  }, [selectedDate]);
+  const selectedDateObject = useMemo(() => dateFromKey(selectedDate), [selectedDate]);
+  const selectedDateLabel = useMemo(() => format(selectedDateObject, 'yyyy年 MM月dd日'), [selectedDateObject]);
+  const selectedWeekLabel = useMemo(() => format(selectedDateObject, 'EEEE'), [selectedDateObject]);
 
   useEffect(() => {
     if (editing) return;
@@ -345,11 +365,19 @@ function App() {
 
   return (
     <div
-      className={`app-shell theme-${snapshot.settings.theme} layout-${snapshot.settings.layoutMode} ${editing ? 'is-editing' : 'is-viewing'}`}
+      className={`app-shell calendar-widget theme-${snapshot.settings.theme} layout-${snapshot.settings.layoutMode} ${editing ? 'is-editing' : 'is-viewing'}`}
       style={{ '--surface-opacity': snapshot.settings.opacity, '--background-intensity': snapshot.settings.backgroundIntensity } as React.CSSProperties}
     >
-      <aside className="sidebar">
-        <div className="drag-strip" aria-hidden="true" />
+      <aside className="sidebar calendar-sidebar">
+        <div className="drag-strip calendar-drag-strip" aria-hidden="true" />
+
+        <section className="calendar-date-plate" aria-label="当前日期">
+          <div>
+            <span>{format(selectedDateObject, 'MMM yyyy')}</span>
+            <strong>{format(selectedDateObject, 'dd')}</strong>
+          </div>
+          <p>{selectedWeekLabel}</p>
+        </section>
 
         {editing && (
           <label className="search-box">
@@ -359,15 +387,19 @@ function App() {
           </label>
         )}
 
-        <nav className="smart-views calendar-days" aria-label="提醒日期">
+        <nav className="calendar-day-grid" aria-label="提醒日期">
           {calendarDays.map((day, index) => {
-            const count = snapshot.tasks.filter((task) => taskCalendarDate(task) === day.key && !task.completedAt).length;
+            const count = dateCounts.get(day.key) ?? 0;
             return (
-              <button key={day.key} className={`view-tile blue ${selectedDate === day.key ? 'active' : ''}`} onClick={() => { setSelectedDate(day.key); setQuery(''); setComposerOpen(false); setEditingId(null); }}>
-                <span className="view-icon"><CalendarDays size={17} /></span>
-                <strong>{day.day}</strong>
+              <button
+                key={day.key}
+                className={`calendar-day-cell ${selectedDate === day.key ? 'active' : ''} ${day.key === todayKey ? 'today' : ''}`}
+                onClick={() => { setSelectedDate(day.key); setQuery(''); setComposerOpen(false); setEditingId(null); }}
+              >
                 <span>{index === 0 ? 'Today' : day.week}</span>
-                <small>{count} 个提醒</small>
+                <strong>{day.day}</strong>
+                {calendarRangeDays === 30 && <em>{day.month}</em>}
+                {count > 0 && <small>{count}</small>}
               </button>
             );
           })}
@@ -393,22 +425,25 @@ function App() {
         )}
       </aside>
 
-      <main className="task-pane">
-        <header className="pane-header">
+      <main className="task-pane calendar-agenda-pane">
+        <header className="pane-header calendar-agenda-header">
           <div>
-            <span className="title-symbol blue"><CalendarDays size={18} /></span>
-            <h1 className="blue">Calendar</h1>
-            <p>{selectedDateLabel} · {visibleTasks.length} 个提醒</p>
+            <span className="calendar-eyebrow">Calendar reminder</span>
+            <h1>{selectedDate === todayKey ? 'Today' : format(selectedDateObject, 'MMM d')}</h1>
+            <p>{selectedDateLabel} · {visibleTasks.length} 个提醒 · 未来 {calendarRangeDays} 天</p>
           </div>
-          {editing && <button className="icon-button add-button" onClick={openComposer} title="添加任务"><Plus size={24} /></button>}
+          <div className="agenda-header-side">
+            <span><Clock3 size={15} />{visibleTasks.length}</span>
+            {editing && <button className="icon-button add-button" onClick={openComposer} title="添加提醒"><Plus size={24} /></button>}
+          </div>
         </header>
 
-        <section className="task-scroll" aria-live="polite">
+        <section className="task-scroll calendar-agenda-scroll" aria-live="polite">
           {composerOpen && (
-            <div className="composer">
-              <span className="completion-ring idle" />
+            <div className="composer calendar-composer">
+              <span className="agenda-time-label">NEW</span>
               <div className="composer-fields">
-                <input autoFocus className="title-input" value={composer.title} onChange={(event) => setComposer({ ...composer, title: event.target.value })} onKeyDown={(event) => { if (event.key === 'Enter') void createTask(); }} placeholder="新任务" maxLength={300} />
+                <input autoFocus className="title-input" value={composer.title} onChange={(event) => setComposer({ ...composer, title: event.target.value })} onKeyDown={(event) => { if (event.key === 'Enter') void createTask(); }} placeholder="新提醒" maxLength={300} />
                 <textarea value={composer.notes} onChange={(event) => setComposer({ ...composer, notes: event.target.value })} placeholder="备注（可选）" maxLength={10000} />
                 <div className="editor-footer">
                   <label><CalendarDays size={15} /><input type="date" value={composer.dueDate} onChange={(event) => setComposer({ ...composer, dueDate: event.target.value })} /></label>
@@ -423,30 +458,27 @@ function App() {
           )}
 
           {visibleTasks.length === 0 && !composerOpen ? (
-            <div className="empty-state">
-              <span className="empty-icon blue"><CalendarDays size={26} /></span>
+            <div className="empty-state calendar-empty-state">
+              <span className="empty-icon"><CalendarDays size={26} /></span>
               <h2>{query ? '没有匹配的任务' : 'No Reminders'}</h2>
               <p>{query ? '换一个关键词试试。' : '这一天还没有提醒。'}</p>
-              {editing && !query && <button className="empty-add" onClick={openComposer}><CirclePlus size={17} />添加任务</button>}
+              {editing && !query && <button className="empty-add" onClick={openComposer}><CirclePlus size={17} />添加提醒</button>}
             </div>
           ) : (
-            <div className="task-list">
+            <div className="agenda-list">
               {visibleTasks.map((task) => (
                 <article
                   key={task.id}
-                  className={`task-row ${task.completedAt ? 'completed' : ''} ${editingId === task.id ? 'expanded' : ''}`}
+                  className={`agenda-item ${task.completedAt ? 'completed' : ''} ${editingId === task.id ? 'expanded' : ''}`}
                   draggable={editing && editingId !== task.id}
                   onDragStart={() => setDraggedId(task.id)}
                   onDragOver={(event) => editing && event.preventDefault()}
                   onDrop={() => void dropOn(task.id)}
                 >
-                  {editing && <span className="drag-handle" title="拖动排序"><GripVertical size={16} /></span>}
-                  <button className="completion-button" disabled={!editing} onClick={() => void toggleCompleted(task)} title={task.completedAt ? '恢复任务' : '完成任务'}>
-                    {task.completedAt && <Check size={13} strokeWidth={3} />}
-                  </button>
+                  <time className="agenda-time-label">{formatAgendaTime(task.remindAt)}</time>
 
                   {editingId === task.id ? (
-                    <div className="task-editor">
+                    <div className="task-editor agenda-card agenda-editor-card">
                       <input autoFocus className="title-input" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} maxLength={300} />
                       <textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="备注（可选）" maxLength={10000} />
                       <div className="editor-footer">
@@ -459,8 +491,16 @@ function App() {
                       </div>
                     </div>
                   ) : (
-                    <button className="task-content" disabled={!editing} onClick={() => beginEdit(task)}>
-                      <span className="task-title">{task.title}</span>
+                    <div className="agenda-card">
+                      <div className="agenda-card-top">
+                        <button className="completion-button" disabled={!editing} onClick={() => void toggleCompleted(task)} title={task.completedAt ? '恢复提醒' : '完成提醒'}>
+                          {task.completedAt && <Check size={13} strokeWidth={3} />}
+                        </button>
+                        <button className="task-content" disabled={!editing} onClick={() => beginEdit(task)}>
+                          <span className="task-title">{task.title}</span>
+                        </button>
+                        {editing && <span className="drag-handle" title="拖动排序"><GripVertical size={16} /></span>}
+                      </div>
                       {(task.notes || task.dueDate || task.remindAt || task.recurrence !== 'none') && (
                         <span className="task-meta">
                           {task.notes && <span className="task-notes">{task.notes}</span>}
@@ -473,7 +513,7 @@ function App() {
                           )}
                         </span>
                       )}
-                    </button>
+                    </div>
                   )}
                 </article>
               ))}
