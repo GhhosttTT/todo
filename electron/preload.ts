@@ -7,7 +7,6 @@ const api: TodoApi = {
   updateTask: (input) => ipcRenderer.invoke('todo:update-task', input),
   setTaskCompleted: (input) => ipcRenderer.invoke('todo:set-completed', input),
   deleteTask: (input) => ipcRenderer.invoke('todo:delete-task', input),
-  restoreDeletedTask: (input) => ipcRenderer.invoke('todo:restore-task', input),
   reorderTasks: (input) => ipcRenderer.invoke('todo:reorder-tasks', input),
   updateSettings: (input) => ipcRenderer.invoke('todo:update-settings', input),
   setShortcutCapture: (capturing) => ipcRenderer.invoke('todo:set-shortcut-capture', capturing),

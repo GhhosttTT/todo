@@ -11,7 +11,6 @@ import {
   MonitorDown,
   Plus,
   Repeat2,
-  RotateCcw,
   Search,
   Settings as SettingsIcon,
   Moon,
@@ -103,7 +102,7 @@ function App() {
   const [shortcutDraft, setShortcutDraft] = useState('Ctrl+Alt+T');
   const [shortcutRecording, setShortcutRecording] = useState(false);
   const [shortcutError, setShortcutError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ text: string; kind: 'error' | 'info'; undoToken?: string } | null>(null);
+  const [notice, setNotice] = useState<{ text: string; kind: 'error' | 'info' } | null>(null);
   const activeTheme = snapshot?.settings.theme;
 
   useEffect(() => {
@@ -140,7 +139,7 @@ function App() {
 
   useEffect(() => {
     if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(null), notice.undoToken ? 8000 : 4200);
+    const timer = window.setTimeout(() => setNotice(null), 4200);
     return () => window.clearTimeout(timer);
   }, [notice]);
 
@@ -265,14 +264,8 @@ function App() {
     const result = await window.todo.deleteTask({ id, baseRevision: snapshot.revision });
     if (applyResult(result)) {
       setEditingId(null);
-      setNotice({ text: '任务已删除', kind: 'info', undoToken: result.undoToken });
+      setNotice({ text: '任务已删除', kind: 'info' });
     }
-  };
-
-  const undoDelete = async () => {
-    if (!snapshot || !notice?.undoToken) return;
-    const result = await window.todo.restoreDeletedTask({ token: notice.undoToken, baseRevision: snapshot.revision });
-    if (applyResult(result)) setNotice({ text: '任务已恢复', kind: 'info' });
   };
 
   const changeSettings = async (settings: Parameters<typeof window.todo.updateSettings>[0]['settings']) => {
@@ -516,7 +509,7 @@ function App() {
                       <label><Clock3 size={15} /><input type="datetime-local" value={draft.remindAt} onChange={(event) => setDraft({ ...draft, remindAt: event.target.value })} /></label>
                       <label><Repeat2 size={15} /><select value={draft.recurrence} onChange={(event) => setDraft({ ...draft, recurrence: event.target.value as RecurrenceFrequency })}>{recurrenceOptions.map((option) => <option key={option} value={option}>{recurrenceLabels[option]}</option>)}</select></label>
                       {!selectedTask.completedAt && <button className="completion-action" onClick={() => void toggleCompleted(selectedTask)}>完成</button>}
-                      {selectedTask.completedAt && <span className="completed-lock">已完成，不可恢复</span>}
+                      {selectedTask.completedAt && <span className="completed-lock">已完成</span>}
                       <button className="danger-icon" onClick={() => void deleteTask(selectedTask.id)} title="删除任务"><Trash2 size={16} /></button>
                       <button className="text-button" onClick={() => setEditingId(null)}>取消</button>
                       <button className="text-button primary" disabled={!draft.title.trim()} onClick={() => void saveTask()}>保存</button>
@@ -644,7 +637,6 @@ function App() {
         <div className={`notice ${notice.kind}`}>
           {notice.kind === 'error' ? <CircleAlert size={17} /> : <Check size={17} />}
           <span>{notice.text}</span>
-          {notice.undoToken && <button onClick={() => void undoDelete()}><RotateCcw size={15} />撤销</button>}
         </div>
       )}
 

@@ -330,7 +330,7 @@ export class TaskStore {
       } catch {
         this.state = defaultState();
         this.readOnly = true;
-        this.recoveryMessage = '主数据和备份均无法读取，已进入只读恢复模式，原文件未被覆盖。';
+        this.recoveryMessage = '主数据和备份均无法读取，已进入只读保护模式，原文件未被覆盖。';
         return this.result();
       }
     }
@@ -414,7 +414,7 @@ export class TaskStore {
     return this.mutate(baseRevision, (draft) => {
       const task = draft.tasks.find((item) => item.id === id);
       if (!task) throw new Error('任务不存在。');
-      if (!completed && task.completedAt) throw new Error('已完成的任务不可恢复。');
+      if (!completed && task.completedAt) throw new Error('任务已完成。');
       const completedAt = completed ? new Date().toISOString() : null;
       task.completedAt = completedAt;
       task.updatedAt = new Date().toISOString();
@@ -422,19 +422,11 @@ export class TaskStore {
     });
   }
 
-  deleteTask(baseRevision: number, id: string): Promise<{ snapshot: StoreSnapshot; deleted: Task }> {
-    let deleted: Task | undefined;
+  deleteTask(baseRevision: number, id: string): Promise<StoreSnapshot> {
     return this.mutate(baseRevision, (draft) => {
       const index = draft.tasks.findIndex((item) => item.id === id);
       if (index < 0) throw new Error('任务不存在。');
-      [deleted] = draft.tasks.splice(index, 1);
-    }).then((snapshot) => ({ snapshot, deleted: deleted as Task }));
-  }
-
-  restoreTask(baseRevision: number, task: Task): Promise<StoreSnapshot> {
-    return this.mutate(baseRevision, (draft) => {
-      if (draft.tasks.some(({ id }) => id === task.id)) throw new Error('任务已存在。');
-      draft.tasks.push(task);
+      draft.tasks.splice(index, 1);
     });
   }
 

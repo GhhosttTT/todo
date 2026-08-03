@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import type { BrowserWindow } from 'electron';
-import type { AppSnapshot, MutationResult, RuntimeStatus, Settings, Task } from '../src/types';
+import type { AppSnapshot, MutationResult, RuntimeStatus, Settings } from '../src/types';
 import { ReadOnlyStoreError, RevisionConflictError, TaskStore } from './taskStore';
 import type { WindowController } from './windowController';
 
@@ -17,10 +17,7 @@ interface IpcDependencies {
   transientSettings?: Partial<Settings>;
 }
 
-interface UndoEntry { task: Task; expiresAt: number }
-
 export function registerIpcHandlers(deps: IpcDependencies): void {
-  const undo = new Map<string, UndoEntry>();
   const withTransientSettings = (storeSnapshot = deps.store.getSnapshot()) => ({
     ...storeSnapshot,
     settings: { ...storeSnapshot.settings, ...deps.transientSettings },
@@ -56,23 +53,13 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 
   ipcMain.handle('todo:delete-task', async (_event, input): Promise<MutationResult> => {
     try {
-      const { snapshot: changed, deleted } = await deps.store.deleteTask(input.baseRevision, input.id);
-      undo.clear();
-      const token = crypto.randomUUID();
-      undo.set(token, { task: deleted, expiresAt: Date.now() + 8000 });
+      const changed = await deps.store.deleteTask(input.baseRevision, input.id);
       deps.onStoreChanged?.();
       broadcast();
-      return result(changed, { undoToken: token });
+      return result(changed);
     } catch (error) {
       return { ok: false, snapshot: snapshot(), conflict: error instanceof RevisionConflictError, error: error instanceof Error ? error.message : '删除失败。' };
     }
-  });
-
-  ipcMain.handle('todo:restore-task', (_event, input) => {
-    const entry = undo.get(input.token);
-    if (!entry || entry.expiresAt < Date.now()) return Promise.resolve({ ok: false, snapshot: snapshot(), error: '撤销已过期。' } satisfies MutationResult);
-    undo.delete(input.token);
-    return mutation(() => deps.store.restoreTask(input.baseRevision, entry.task));
   });
 
   ipcMain.handle('todo:update-settings', async (_event, input): Promise<MutationResult> => {
@@ -108,7 +95,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 export function clearIpcHandlers(): void {
   for (const channel of [
     'todo:get-snapshot', 'todo:create-task', 'todo:update-task', 'todo:set-completed', 'todo:delete-task',
-    'todo:restore-task', 'todo:reorder-tasks', 'todo:update-settings', 'todo:set-shortcut-capture', 'todo:set-edit-mode', 'todo:retry-desktop-binding',
+    'todo:reorder-tasks', 'todo:update-settings', 'todo:set-shortcut-capture', 'todo:set-edit-mode', 'todo:retry-desktop-binding',
   ]) ipcMain.removeHandler(channel);
 }
 

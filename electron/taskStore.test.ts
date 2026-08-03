@@ -118,13 +118,13 @@ describe('TaskStore', () => {
     });
   });
 
-  it('does not allow completed tasks to be restored', async () => {
+  it('does not allow completed tasks to become active again', async () => {
     const store = createStore();
     store.load();
     const created = await store.createTask(0, { title: 'Finished reminder' });
     const completed = await store.setCompleted(created.revision, created.tasks[0].id, true);
 
-    await expect(store.setCompleted(completed.revision, completed.tasks[0].id, false)).rejects.toThrow('已完成的任务不可恢复。');
+    await expect(store.setCompleted(completed.revision, completed.tasks[0].id, false)).rejects.toThrow('任务已完成。');
   });
 
   it('creates the next occurrence when a recurring reminder is notified even if it is not completed', async () => {
