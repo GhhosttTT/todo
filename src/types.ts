@@ -41,6 +41,7 @@ export interface Settings {
   showCompleted: boolean;
   notificationTimeoutType: NotificationTimeoutType;
   notificationDurationSeconds: number;
+  calendarRangeDays: 7 | 30;
   opacity: number;
   backgroundIntensity: number;
 }
@@ -108,7 +109,7 @@ export interface TodoApi {
   deleteTask(input: { id: string; baseRevision: number }): Promise<MutationResult>;
   restoreDeletedTask(input: { token: string; baseRevision: number }): Promise<MutationResult>;
   reorderTasks(input: { ids: string[]; baseRevision: number }): Promise<MutationResult>;
-  updateSettings(input: { settings: Partial<Pick<Settings, 'selectedView' | 'layoutMode' | 'theme' | 'globalShortcut' | 'launchAtLogin' | 'showCompleted' | 'notificationTimeoutType' | 'notificationDurationSeconds' | 'opacity' | 'backgroundIntensity'>>; baseRevision: number }): Promise<MutationResult>;
+  updateSettings(input: { settings: Partial<Pick<Settings, 'selectedView' | 'layoutMode' | 'theme' | 'globalShortcut' | 'launchAtLogin' | 'showCompleted' | 'notificationTimeoutType' | 'notificationDurationSeconds' | 'calendarRangeDays' | 'opacity' | 'backgroundIntensity'>>; baseRevision: number }): Promise<MutationResult>;
   setShortcutCapture(capturing: boolean): Promise<RuntimeStatus>;
   setEditMode(editing: boolean): Promise<RuntimeStatus>;
   retryDesktopBinding(): Promise<DesktopBindingStatus>;

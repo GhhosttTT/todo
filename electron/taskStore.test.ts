@@ -79,6 +79,15 @@ describe('TaskStore', () => {
     });
   });
 
+  it('persists the calendar range preference', async () => {
+    const store = createStore();
+    const loaded = store.load();
+
+    await store.updateSettings(loaded.revision, { calendarRangeDays: 30 });
+
+    expect(new TaskStore(store.stateFile).load().settings.calendarRangeDays).toBe(30);
+  });
+
   it('persists mutations and reloads them', async () => {
     const store = createStore();
     store.load();

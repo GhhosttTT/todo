@@ -136,10 +136,11 @@ function App() {
   }, []);
 
   const editing = snapshot?.runtime.windowMode === 'editing' || snapshot?.runtime.windowMode === 'entering-editing';
-  const calendarDays = useMemo(() => Array.from({ length: 7 }, (_, index) => {
+  const calendarRangeDays = snapshot?.settings.calendarRangeDays ?? 7;
+  const calendarDays = useMemo(() => Array.from({ length: calendarRangeDays }, (_, index) => {
     const date = addDays(new Date(), index);
     return { key: format(date, 'yyyy-MM-dd'), day: format(date, 'dd'), week: format(date, 'EEE') };
-  }), [todayKey]);
+  }), [calendarRangeDays, todayKey]);
   const visibleTasks = useMemo(() => {
     if (!snapshot) return [];
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -528,6 +529,18 @@ function App() {
               </button>
               <button className={snapshot.settings.theme === 'dark' ? 'active' : ''} onClick={() => void changeSettings({ theme: 'dark' })}>
                 <Moon size={15} />黑色
+              </button>
+            </div>
+          </section>
+
+          <section>
+            <h3><CalendarDays size={17} />日期范围</h3>
+            <div className="theme-segmented" aria-label="日期范围">
+              <button className={snapshot.settings.calendarRangeDays === 7 ? 'active' : ''} onClick={() => void changeSettings({ calendarRangeDays: 7 })}>
+                未来 7 天
+              </button>
+              <button className={snapshot.settings.calendarRangeDays === 30 ? 'active' : ''} onClick={() => void changeSettings({ calendarRangeDays: 30 })}>
+                未来 30 天
               </button>
             </div>
           </section>
