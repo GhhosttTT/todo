@@ -5,9 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
-  CirclePlus,
   Clock3,
-  GripVertical,
   HardDrive,
   Keyboard,
   LayoutPanelLeft,
@@ -106,7 +104,6 @@ function App() {
   const [shortcutDraft, setShortcutDraft] = useState('Ctrl+Alt+T');
   const [shortcutRecording, setShortcutRecording] = useState(false);
   const [shortcutError, setShortcutError] = useState<string | null>(null);
-  const [draggedId, setDraggedId] = useState<string | null>(null);
   const [pendingLayoutMode, setPendingLayoutMode] = useState<LayoutMode | null>(null);
   const [notice, setNotice] = useState<{ text: string; kind: 'error' | 'info'; undoToken?: string } | null>(null);
   const activeTheme = snapshot?.settings.theme;
@@ -156,39 +153,9 @@ function App() {
   }, []);
 
   const editing = snapshot?.runtime.windowMode === 'editing' || snapshot?.runtime.windowMode === 'entering-editing';
-  const calendarRangeDays = snapshot?.settings.calendarRangeDays ?? 7;
-  const calendarDays = useMemo(() => Array.from({ length: calendarRangeDays }, (_, index) => {
-    const date = addDays(new Date(), index);
-    return { key: format(date, 'yyyy-MM-dd'), day: format(date, 'dd'), week: format(date, 'EEE'), month: format(date, 'MMM') };
-  }), [calendarRangeDays, todayKey]);
-  const dateCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    snapshot?.tasks.forEach((task) => {
-      if (task.completedAt) return;
-      const key = taskCalendarDate(task);
-      if (!key) return;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    });
-    return counts;
-  }, [snapshot]);
-  const visibleTasks = useMemo(() => {
-    if (!snapshot) return [];
-    const normalizedQuery = query.trim().toLocaleLowerCase();
-    return snapshot.tasks
-      .filter((task) => taskCalendarDate(task) === selectedDate)
-      .filter((task) => snapshot.settings.showCompleted || !task.completedAt)
-      .filter((task) => !normalizedQuery || task.title.toLocaleLowerCase().includes(normalizedQuery) || task.notes.toLocaleLowerCase().includes(normalizedQuery))
-      .sort((left, right) => {
-        if (Boolean(left.completedAt) !== Boolean(right.completedAt)) return left.completedAt ? 1 : -1;
-        const leftTime = left.remindAt ? Date.parse(left.remindAt) : Number.MAX_SAFE_INTEGER;
-        const rightTime = right.remindAt ? Date.parse(right.remindAt) : Number.MAX_SAFE_INTEGER;
-        if (leftTime !== rightTime) return leftTime - rightTime;
-        return left.sortOrder - right.sortOrder || left.createdAt.localeCompare(right.createdAt);
-      });
-  }, [query, selectedDate, snapshot]);
   const selectedDateObject = useMemo(() => dateFromKey(selectedDate), [selectedDate]);
   const selectedDateLabel = useMemo(() => format(selectedDateObject, 'yyyy年 MM月dd日'), [selectedDateObject]);
-  const selectedWeekLabel = useMemo(() => format(selectedDateObject, 'EEEE'), [selectedDateObject]);
+  const selectedTask = useMemo(() => snapshot?.tasks.find((task) => task.id === editingId) ?? null, [editingId, snapshot?.tasks]);
   const monthCells = useMemo(() => {
     const gridStart = startOfWeek(startOfMonth(selectedDateObject));
     const gridEnd = endOfWeek(endOfMonth(selectedDateObject));
@@ -226,7 +193,6 @@ function App() {
     setSettingsOpen(false);
     setComposerOpen(false);
     setEditingId(null);
-    setDraggedId(null);
   }, [editing]);
 
   const openComposer = () => {
@@ -303,18 +269,6 @@ function App() {
     if (!snapshot || !notice?.undoToken) return;
     const result = await window.todo.restoreDeletedTask({ token: notice.undoToken, baseRevision: snapshot.revision });
     if (applyResult(result)) setNotice({ text: '任务已恢复', kind: 'info' });
-  };
-
-  const dropOn = async (targetId: string) => {
-    if (!snapshot || !draggedId || draggedId === targetId) return;
-    const ids = visibleTasks.map(({ id }) => id);
-    const sourceIndex = ids.indexOf(draggedId);
-    const targetIndex = ids.indexOf(targetId);
-    if (sourceIndex < 0 || targetIndex < 0) return;
-    ids.splice(sourceIndex, 1);
-    ids.splice(targetIndex, 0, draggedId);
-    setDraggedId(null);
-    applyResult(await window.todo.reorderTasks({ ids, baseRevision: snapshot.revision }));
   };
 
   const changeSettings = async (settings: Parameters<typeof window.todo.updateSettings>[0]['settings']) => {
@@ -515,100 +469,55 @@ function App() {
           </div>
         </section>
 
-        <aside className="day-agenda-panel" aria-label="选中日期提醒">
-          <header className="day-agenda-header">
-            <div>
-              <span>{selectedWeekLabel}</span>
-              <h1>{format(selectedDateObject, 'MMM d')}</h1>
-              <p>{selectedDateLabel} · {visibleTasks.length} 个提醒</p>
-            </div>
-            {editing && <button className="icon-button add-button" onClick={openComposer} title="添加提醒"><Plus size={24} /></button>}
-          </header>
+        {editing && <button className="calendar-floating-add" onClick={openComposer} title="添加提醒"><Plus size={28} /></button>}
+      </main>
 
-          <section className="task-scroll calendar-agenda-scroll" aria-live="polite">
-          {composerOpen && (
-            <div className="composer calendar-composer">
-              <span className="agenda-time-label">NEW</span>
-              <div className="composer-fields">
-                <input autoFocus className="title-input" value={composer.title} onChange={(event) => setComposer({ ...composer, title: event.target.value })} onKeyDown={(event) => { if (event.key === 'Enter') void createTask(); }} placeholder="新提醒" maxLength={300} />
-                <textarea value={composer.notes} onChange={(event) => setComposer({ ...composer, notes: event.target.value })} placeholder="备注（可选）" maxLength={10000} />
-                <div className="editor-footer">
-                  <label><CalendarDays size={15} /><input type="date" value={composer.dueDate} onChange={(event) => setComposer({ ...composer, dueDate: event.target.value })} /></label>
-                  <label><Clock3 size={15} /><input type="datetime-local" value={composer.remindAt} onChange={(event) => setComposer({ ...composer, remindAt: event.target.value })} /></label>
-                  <label><Repeat2 size={15} /><select value={composer.recurrence} onChange={(event) => setComposer({ ...composer, recurrence: event.target.value as RecurrenceFrequency })}>{recurrenceOptions.map((option) => <option key={option} value={option}>{recurrenceLabels[option]}</option>)}</select></label>
-                  <span />
-                  <button className="text-button" onClick={() => setComposerOpen(false)}>取消</button>
-                  <button className="text-button primary" disabled={!composer.title.trim()} onClick={() => void createTask()}>添加</button>
-                </div>
+      {editing && composerOpen && (
+        <div className="event-popover-layer" onClick={() => setComposerOpen(false)}>
+          <aside className="event-popover" onClick={(event) => event.stopPropagation()} aria-label="新建提醒">
+            <header>
+              <div><span>NEW REMINDER</span><h2>{selectedDateLabel}</h2></div>
+              <button className="icon-button" onClick={() => setComposerOpen(false)} title="关闭"><X size={19} /></button>
+            </header>
+            <div className="task-editor">
+              <input autoFocus className="title-input" value={composer.title} onChange={(event) => setComposer({ ...composer, title: event.target.value })} onKeyDown={(event) => { if (event.key === 'Enter') void createTask(); }} placeholder="新提醒" maxLength={300} />
+              <textarea value={composer.notes} onChange={(event) => setComposer({ ...composer, notes: event.target.value })} placeholder="备注（可选）" maxLength={10000} />
+              <div className="editor-footer">
+                <label><CalendarDays size={15} /><input type="date" value={composer.dueDate} onChange={(event) => setComposer({ ...composer, dueDate: event.target.value })} /></label>
+                <label><Clock3 size={15} /><input type="datetime-local" value={composer.remindAt} onChange={(event) => setComposer({ ...composer, remindAt: event.target.value })} /></label>
+                <label><Repeat2 size={15} /><select value={composer.recurrence} onChange={(event) => setComposer({ ...composer, recurrence: event.target.value as RecurrenceFrequency })}>{recurrenceOptions.map((option) => <option key={option} value={option}>{recurrenceLabels[option]}</option>)}</select></label>
+                <span />
+                <button className="text-button" onClick={() => setComposerOpen(false)}>取消</button>
+                <button className="text-button primary" disabled={!composer.title.trim()} onClick={() => void createTask()}>添加</button>
               </div>
             </div>
-          )}
+          </aside>
+        </div>
+      )}
 
-          {visibleTasks.length === 0 && !composerOpen ? (
-            <div className="empty-state calendar-empty-state">
-              <span className="empty-icon"><CalendarDays size={26} /></span>
-              <h2>{query ? '没有匹配的任务' : 'No Reminders'}</h2>
-              <p>{query ? '换一个关键词试试。' : '这一天还没有提醒。'}</p>
-              {editing && !query && <button className="empty-add" onClick={openComposer}><CirclePlus size={17} />添加提醒</button>}
+      {editing && selectedTask && (
+        <div className="event-popover-layer" onClick={() => setEditingId(null)}>
+          <aside className="event-popover" onClick={(event) => event.stopPropagation()} aria-label="编辑提醒">
+            <header>
+              <div><span>REMINDER</span><h2>{selectedTask.title}</h2></div>
+              <button className="icon-button" onClick={() => setEditingId(null)} title="关闭"><X size={19} /></button>
+            </header>
+            <div className="task-editor">
+              <input autoFocus className="title-input" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} maxLength={300} />
+              <textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="备注（可选）" maxLength={10000} />
+              <div className="editor-footer">
+                <label><CalendarDays size={15} /><input type="date" value={draft.dueDate} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value })} /></label>
+                <label><Clock3 size={15} /><input type="datetime-local" value={draft.remindAt} onChange={(event) => setDraft({ ...draft, remindAt: event.target.value })} /></label>
+                <label><Repeat2 size={15} /><select value={draft.recurrence} onChange={(event) => setDraft({ ...draft, recurrence: event.target.value as RecurrenceFrequency })}>{recurrenceOptions.map((option) => <option key={option} value={option}>{recurrenceLabels[option]}</option>)}</select></label>
+                <button className="completion-action" onClick={() => void toggleCompleted(selectedTask)}>{selectedTask.completedAt ? '恢复' : '完成'}</button>
+                <button className="danger-icon" onClick={() => void deleteTask(selectedTask.id)} title="删除任务"><Trash2 size={16} /></button>
+                <button className="text-button" onClick={() => setEditingId(null)}>取消</button>
+                <button className="text-button primary" disabled={!draft.title.trim()} onClick={() => void saveTask()}>保存</button>
+              </div>
             </div>
-          ) : (
-            <div className="agenda-list">
-              {visibleTasks.map((task) => (
-                <article
-                  key={task.id}
-                  className={`agenda-item ${task.completedAt ? 'completed' : ''} ${editingId === task.id ? 'expanded' : ''}`}
-                  draggable={editing && editingId !== task.id}
-                  onDragStart={() => setDraggedId(task.id)}
-                  onDragOver={(event) => editing && event.preventDefault()}
-                  onDrop={() => void dropOn(task.id)}
-                >
-                  <time className="agenda-time-label">{formatAgendaTime(task.remindAt)}</time>
-
-                  {editingId === task.id ? (
-                    <div className="task-editor agenda-card agenda-editor-card">
-                      <input autoFocus className="title-input" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} maxLength={300} />
-                      <textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="备注（可选）" maxLength={10000} />
-                      <div className="editor-footer">
-                        <label><CalendarDays size={15} /><input type="date" value={draft.dueDate} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value })} /></label>
-                        <label><Clock3 size={15} /><input type="datetime-local" value={draft.remindAt} onChange={(event) => setDraft({ ...draft, remindAt: event.target.value })} /></label>
-                        <label><Repeat2 size={15} /><select value={draft.recurrence} onChange={(event) => setDraft({ ...draft, recurrence: event.target.value as RecurrenceFrequency })}>{recurrenceOptions.map((option) => <option key={option} value={option}>{recurrenceLabels[option]}</option>)}</select></label>
-                        <button className="danger-icon" onClick={() => void deleteTask(task.id)} title="删除任务"><Trash2 size={16} /></button>
-                        <button className="text-button" onClick={() => setEditingId(null)}>取消</button>
-                        <button className="text-button primary" disabled={!draft.title.trim()} onClick={() => void saveTask()}>保存</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="agenda-card">
-                      <div className="agenda-card-top">
-                        <button className="completion-button" disabled={!editing} onClick={() => void toggleCompleted(task)} title={task.completedAt ? '恢复提醒' : '完成提醒'}>
-                          {task.completedAt && <Check size={13} strokeWidth={3} />}
-                        </button>
-                        <button className="task-content" disabled={!editing} onClick={() => beginEdit(task)}>
-                          <span className="task-title">{task.title}</span>
-                        </button>
-                        {editing && <span className="drag-handle" title="拖动排序"><GripVertical size={16} /></span>}
-                      </div>
-                      {(task.notes || task.dueDate || task.remindAt || task.recurrence !== 'none') && (
-                        <span className="task-meta">
-                          {task.notes && <span className="task-notes">{task.notes}</span>}
-                          {(task.dueDate || task.remindAt || task.recurrence !== 'none') && (
-                            <span className="task-timing-row">
-                              {task.dueDate && <span className={task.dueDate < todayKey && !task.completedAt ? 'overdue' : ''}><CalendarDays size={13} />{task.dueDate}</span>}
-                              {task.remindAt && <span><Clock3 size={13} />{formatReminder(task.remindAt)}</span>}
-                              {task.recurrence !== 'none' && <span><Repeat2 size={13} />{recurrenceLabels[task.recurrence]}</span>}
-                            </span>
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </article>
-              ))}
-            </div>
-          )}
-          </section>
-        </aside>
-      </main>
+          </aside>
+        </div>
+      )}
 
       {!editing && snapshot.settings.layoutMode === 'compact' && (
         <div className="shortcut-hint compact-shortcut-hint" aria-label={`按 ${snapshot.settings.globalShortcut} 进入编辑模式`}>
@@ -657,18 +566,6 @@ function App() {
               </button>
               <button className={snapshot.settings.theme === 'dark' ? 'active' : ''} onClick={() => void changeSettings({ theme: 'dark' })}>
                 <Moon size={15} />黑色
-              </button>
-            </div>
-          </section>
-
-          <section>
-            <h3><CalendarDays size={17} />日期范围</h3>
-            <div className="theme-segmented" aria-label="日期范围">
-              <button className={snapshot.settings.calendarRangeDays === 7 ? 'active' : ''} onClick={() => void changeSettings({ calendarRangeDays: 7 })}>
-                未来 7 天
-              </button>
-              <button className={snapshot.settings.calendarRangeDays === 30 ? 'active' : ''} onClick={() => void changeSettings({ calendarRangeDays: 30 })}>
-                未来 30 天
               </button>
             </div>
           </section>

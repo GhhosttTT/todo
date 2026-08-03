@@ -654,7 +654,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .calendar-month-pane {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 306px;
+  grid-template-columns: minmax(0, 1fr);
   overflow: hidden;
   background:
     radial-gradient(circle at 100% 0, rgba(255, 59, 48, .08), transparent 25%),
@@ -667,7 +667,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   display: grid;
   grid-template-rows: 28px minmax(0, 1fr);
   gap: 0;
-  padding: 14px 14px 14px 16px;
+  padding: 14px 16px 16px;
   overflow: hidden;
 }
 
@@ -766,7 +766,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 .month-event-pill {
   min-width: 0;
-  height: 18px;
+  height: 20px;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -784,7 +784,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .month-event-pill strong {
   min-width: 0;
   overflow: hidden;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -859,6 +859,105 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .day-agenda-panel .agenda-time-label { padding-top: 12px; font-size: 10px; }
 .day-agenda-panel .agenda-card .task-title { font-size: 13px; }
 .day-agenda-panel .empty-state { min-height: 260px; height: auto; }
+
+.calendar-floating-add {
+  position: absolute;
+  z-index: 7;
+  right: 22px;
+  bottom: 22px;
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: white;
+  background: var(--calendar-red);
+  box-shadow: 0 16px 32px rgba(255, 59, 48, .32), 0 3px 8px rgba(31, 37, 47, .2);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.calendar-floating-add:hover {
+  transform: translateY(-1px);
+  background: #ff2f25;
+}
+
+.event-popover-layer {
+  position: absolute;
+  z-index: 18;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(20, 24, 30, .16);
+  backdrop-filter: blur(2px);
+}
+
+.event-popover {
+  width: min(520px, calc(100% - 28px));
+  max-height: min(560px, calc(100% - 28px));
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid rgba(75, 82, 94, .13);
+  border-radius: 8px;
+  background: rgba(252, 253, 255, .96);
+  box-shadow: 0 28px 70px rgba(18, 25, 36, .28), 0 8px 20px rgba(18, 25, 36, .14);
+  -webkit-app-region: no-drag;
+}
+
+.event-popover header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.event-popover header span {
+  color: var(--calendar-red);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.event-popover header h2 {
+  max-width: 390px;
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  color: #252932;
+  font: 700 24px/1.15 'SF Pro Display', 'PingFang SC', 'Noto Sans SC Subset', 'Segoe UI Variable', sans-serif;
+}
+
+.event-popover .task-editor {
+  gap: 10px;
+}
+
+.event-popover .title-input {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(91, 98, 110, .16);
+  border-radius: 6px;
+  background: rgba(246, 248, 251, .9);
+}
+
+.event-popover textarea {
+  min-height: 84px;
+  padding: 9px 10px;
+  border: 1px solid rgba(91, 98, 110, .16);
+  border-radius: 6px;
+  background: rgba(246, 248, 251, .9);
+}
+
+.completion-action {
+  height: 29px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  color: white;
+  background: #31a755;
+  cursor: pointer;
+}
 
 .task-row, .composer {
   position: relative;
@@ -1233,7 +1332,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 .layout-compact .calendar-month-pane {
   grid-template-columns: 1fr;
-  grid-template-rows: minmax(0, 1fr) 156px;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .layout-compact .calendar-month-board {
@@ -1268,7 +1367,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .layout-compact .month-cell-head em { display: none; }
 .layout-compact .month-event-stack { gap: 2px; }
 .layout-compact .month-event-pill {
-  height: 13px;
+  height: 15px;
   padding: 0 3px;
   border-radius: 3px;
 }
@@ -1297,6 +1396,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   min-width: 220px;
 }
 .layout-compact .day-agenda-panel .empty-state { min-height: 70px; }
+
+.layout-compact .calendar-floating-add {
+  right: 13px;
+  bottom: 48px;
+  width: 42px;
+  height: 42px;
+}
+
+.layout-compact .event-popover {
+  width: calc(100% - 22px);
+  padding: 14px;
+}
 
 .notice {
   position: absolute;
@@ -1460,6 +1571,27 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 .theme-dark .day-agenda-header h1 { color: #f1f3f5; }
 .theme-dark .day-agenda-header p { color: #7f8792; }
+
+.theme-dark .event-popover-layer {
+  background: rgba(0, 0, 0, .28);
+}
+
+.theme-dark .event-popover {
+  border-color: rgba(255, 255, 255, .09);
+  background: rgba(25, 28, 33, .98);
+  box-shadow: 0 30px 78px rgba(0, 0, 0, .48), 0 8px 20px rgba(0, 0, 0, .28);
+}
+
+.theme-dark .event-popover header h2 {
+  color: #f1f3f5;
+}
+
+.theme-dark .event-popover .title-input,
+.theme-dark .event-popover textarea {
+  color: #f1f3f5;
+  border-color: rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .055);
+}
 
 .theme-dark .sidebar { border-right-color: rgba(255, 255, 255, .09); }
 .theme-dark.layout-compact .sidebar { border-bottom-color: rgba(255, 255, 255, .09); }

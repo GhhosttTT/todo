@@ -81,7 +81,6 @@ export function createDefaultSettings(): Settings {
     showCompleted: false,
     notificationTimeoutType: 'default',
     notificationDurationSeconds: 12,
-    calendarRangeDays: 7,
     opacity: 0.96,
     backgroundIntensity: 0.78,
   };
@@ -175,7 +174,6 @@ function parseSettings(value: unknown): Settings {
     showCompleted: typeof item.showCompleted === 'boolean' ? item.showCompleted : defaults.showCompleted,
     notificationTimeoutType: isNotificationTimeoutType(item.notificationTimeoutType) ? item.notificationTimeoutType : defaults.notificationTimeoutType,
     notificationDurationSeconds: Math.round(Math.min(300, Math.max(3, finiteNumber(item.notificationDurationSeconds, defaults.notificationDurationSeconds)))),
-    calendarRangeDays: item.calendarRangeDays === 30 ? 30 : 7,
     opacity: Math.min(1, Math.max(0.72, finiteNumber(item.opacity, defaults.opacity))),
     backgroundIntensity: Math.min(1, Math.max(0, finiteNumber(item.backgroundIntensity, defaults.backgroundIntensity))),
   };
