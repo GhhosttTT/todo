@@ -7,11 +7,9 @@ import {
   Clock3,
   GripVertical,
   HardDrive,
-  Inbox,
   Keyboard,
   LayoutPanelLeft,
   LayoutPanelTop,
-  Layers3,
   MonitorDown,
   Plus,
   Repeat2,
@@ -25,15 +23,9 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { shortcutFromKeyInput } from './domain/shortcut';
-import { filterTasks, getViewCounts, localDateKey } from './domain/tasks';
+import { localDateKey } from './domain/tasks';
 import { recurrenceLabels } from './domain/recurrence';
-import type { AppSnapshot, LayoutMode, MutationResult, RecurrenceFrequency, Task, ViewId } from './types';
-
-const viewMeta = {
-  today: { label: 'Today', hint: '今天与逾期', icon: CalendarDays, tone: 'blue' },
-  scheduled: { label: 'Scheduled', hint: '未来计划', icon: Layers3, tone: 'coral' },
-  all: { label: 'All', hint: '全部任务', icon: Inbox, tone: 'graphite' },
-} as const;
+import type { AppSnapshot, LayoutMode, MutationResult, RecurrenceFrequency, Task } from './types';
 
 interface DraftTask {
   title: string;
@@ -44,12 +36,6 @@ interface DraftTask {
 }
 
 const recurrenceOptions: RecurrenceFrequency[] = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
-
-function dueDateForView(view: ViewId): string {
-  if (view === 'today') return localDateKey();
-  if (view === 'scheduled') return format(addDays(new Date(), 1), 'yyyy-MM-dd');
-  return '';
-}
 
 function toDateTimeInput(value: string | null): string {
   if (!value) return '';
@@ -68,6 +54,19 @@ function formatReminder(value: string): string {
   return Number.isFinite(date.getTime()) ? format(date, 'yyyy-MM-dd HH:mm') : value;
 }
 
+function taskCalendarDate(task: Task): string | null {
+  if (task.remindAt) {
+    const date = new Date(task.remindAt);
+    if (Number.isFinite(date.getTime())) return format(date, 'yyyy-MM-dd');
+  }
+  return task.dueDate;
+}
+
+function defaultReminderForDate(dateKey: string): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return format(new Date(year, month - 1, day, 9, 0, 0), "yyyy-MM-dd'T'HH:mm");
+}
+
 function millisecondsUntilNextLocalDay(): number {
   const now = new Date();
   const nextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 2);
@@ -77,6 +76,7 @@ function millisecondsUntilNextLocalDay(): number {
 function App() {
   const [snapshot, setSnapshot] = useState<AppSnapshot | null>(null);
   const [todayKey, setTodayKey] = useState(localDateKey());
+  const [selectedDate, setSelectedDate] = useState(localDateKey());
   const [query, setQuery] = useState('');
   const [composerOpen, setComposerOpen] = useState(false);
   const [composer, setComposer] = useState<DraftTask>({ title: '', notes: '', dueDate: '', remindAt: '', recurrence: 'none' });
@@ -136,14 +136,29 @@ function App() {
   }, []);
 
   const editing = snapshot?.runtime.windowMode === 'editing' || snapshot?.runtime.windowMode === 'entering-editing';
-  const view = snapshot?.settings.selectedView ?? 'all';
-  const counts = useMemo(() => getViewCounts(snapshot?.tasks ?? [], todayKey), [snapshot?.tasks, todayKey]);
-  const visibleTasks = useMemo(() => snapshot ? filterTasks(snapshot.tasks, {
-    view,
-    showCompleted: snapshot.settings.showCompleted,
-    query,
-    today: todayKey,
-  }) : [], [query, snapshot, todayKey, view]);
+  const calendarDays = useMemo(() => Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(new Date(), index);
+    return { key: format(date, 'yyyy-MM-dd'), day: format(date, 'dd'), week: format(date, 'EEE') };
+  }), [todayKey]);
+  const visibleTasks = useMemo(() => {
+    if (!snapshot) return [];
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+    return snapshot.tasks
+      .filter((task) => taskCalendarDate(task) === selectedDate)
+      .filter((task) => snapshot.settings.showCompleted || !task.completedAt)
+      .filter((task) => !normalizedQuery || task.title.toLocaleLowerCase().includes(normalizedQuery) || task.notes.toLocaleLowerCase().includes(normalizedQuery))
+      .sort((left, right) => {
+        if (Boolean(left.completedAt) !== Boolean(right.completedAt)) return left.completedAt ? 1 : -1;
+        const leftTime = left.remindAt ? Date.parse(left.remindAt) : Number.MAX_SAFE_INTEGER;
+        const rightTime = right.remindAt ? Date.parse(right.remindAt) : Number.MAX_SAFE_INTEGER;
+        if (leftTime !== rightTime) return leftTime - rightTime;
+        return left.sortOrder - right.sortOrder || left.createdAt.localeCompare(right.createdAt);
+      });
+  }, [query, selectedDate, snapshot]);
+  const selectedDateLabel = useMemo(() => {
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    return format(new Date(year, month - 1, day), 'yyyy年 MM月dd日');
+  }, [selectedDate]);
 
   useEffect(() => {
     if (editing) return;
@@ -153,18 +168,8 @@ function App() {
     setDraggedId(null);
   }, [editing]);
 
-  const selectView = async (nextView: ViewId) => {
-    if (!snapshot || nextView === view) return;
-    const result = await window.todo.updateSettings({ settings: { selectedView: nextView }, baseRevision: snapshot.revision });
-    if (applyResult(result)) {
-      setComposerOpen(false);
-      setEditingId(null);
-      setQuery('');
-    }
-  };
-
   const openComposer = () => {
-    setComposer({ title: '', notes: '', dueDate: dueDateForView(view), remindAt: '', recurrence: 'none' });
+    setComposer({ title: '', notes: '', dueDate: selectedDate, remindAt: defaultReminderForDate(selectedDate), recurrence: 'none' });
     setComposerOpen(true);
     setEditingId(null);
   };
@@ -332,8 +337,6 @@ function App() {
 
   if (!snapshot) return <div className="boot-state">正在打开 Todo...</div>;
 
-  const meta = viewMeta[view];
-  const Icon = meta.icon;
   const runtimeWarning = snapshot.runtime.desktop.state === 'fallback'
     || snapshot.runtime.dataFallbackReason
     || snapshot.runtime.shortcutError
@@ -355,16 +358,15 @@ function App() {
           </label>
         )}
 
-        <nav className="smart-views" aria-label="固定任务视图">
-          {(Object.keys(viewMeta) as ViewId[]).map((id) => {
-            const item = viewMeta[id];
-            const ItemIcon = item.icon;
+        <nav className="smart-views calendar-days" aria-label="提醒日期">
+          {calendarDays.map((day, index) => {
+            const count = snapshot.tasks.filter((task) => taskCalendarDate(task) === day.key && !task.completedAt).length;
             return (
-              <button key={id} className={`view-tile ${item.tone} ${view === id ? 'active' : ''}`} onClick={() => void selectView(id)}>
-                <span className="view-icon"><ItemIcon size={17} /></span>
-                <strong>{counts[id]}</strong>
-                <span>{item.label}</span>
-                <small>{item.hint}</small>
+              <button key={day.key} className={`view-tile blue ${selectedDate === day.key ? 'active' : ''}`} onClick={() => { setSelectedDate(day.key); setQuery(''); setComposerOpen(false); setEditingId(null); }}>
+                <span className="view-icon"><CalendarDays size={17} /></span>
+                <strong>{day.day}</strong>
+                <span>{index === 0 ? 'Today' : day.week}</span>
+                <small>{count} 个提醒</small>
               </button>
             );
           })}
@@ -393,9 +395,9 @@ function App() {
       <main className="task-pane">
         <header className="pane-header">
           <div>
-            <span className={`title-symbol ${meta.tone}`}><Icon size={18} /></span>
-            <h1 className={meta.tone}>{meta.label}</h1>
-            <p>{meta.hint}</p>
+            <span className="title-symbol blue"><CalendarDays size={18} /></span>
+            <h1 className="blue">Calendar</h1>
+            <p>{selectedDateLabel} · {visibleTasks.length} 个提醒</p>
           </div>
           {editing && <button className="icon-button add-button" onClick={openComposer} title="添加任务"><Plus size={24} /></button>}
         </header>
@@ -421,9 +423,9 @@ function App() {
 
           {visibleTasks.length === 0 && !composerOpen ? (
             <div className="empty-state">
-              <span className={`empty-icon ${meta.tone}`}><Icon size={26} /></span>
+              <span className="empty-icon blue"><CalendarDays size={26} /></span>
               <h2>{query ? '没有匹配的任务' : 'No Reminders'}</h2>
-              <p>{query ? '换一个关键词试试。' : view === 'today' ? '今天没有需要处理的事项。' : view === 'scheduled' ? '未来还没有安排任务。' : '这里会显示你的全部任务。'}</p>
+              <p>{query ? '换一个关键词试试。' : '这一天还没有提醒。'}</p>
               {editing && !query && <button className="empty-add" onClick={openComposer}><CirclePlus size={17} />添加任务</button>}
             </div>
           ) : (
