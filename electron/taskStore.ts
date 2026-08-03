@@ -13,9 +13,10 @@ import { dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { applyVisibleOrder, isValidDateKey } from '../src/domain/tasks';
 import { dimensionsForLayout, minDimensionsForLayout } from '../src/domain/layout';
-import type { LayoutMode, NotificationTimeoutType, Settings, Task, ViewId, WindowBounds } from '../src/types';
+import { advanceDateKeyAfter, advanceDateKeyBySteps, advanceTimestampAfter, isRecurrenceFrequency, isRecurring } from '../src/domain/recurrence';
+import type { LayoutMode, NotificationTimeoutType, RecurrenceFrequency, Settings, Task, ViewId, WindowBounds } from '../src/types';
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const require = createRequire(import.meta.url);
 type ReplaceFileApi = (replaced: string, replacement: string, backup: string, flags: number, exclude: null, reserved: null) => boolean;
 let replaceFileApi: ReplaceFileApi | undefined;
@@ -137,6 +138,10 @@ function parseTask(value: unknown): Task | null {
   if (!isValidTimestamp(remindAt)) return null;
   const notifiedAt = item.notifiedAt === null || typeof item.notifiedAt === 'string' ? item.notifiedAt : null;
   if (!isValidTimestamp(notifiedAt)) return null;
+  const recurrence = isRecurrenceFrequency(item.recurrence) ? item.recurrence : 'none';
+  const recurrenceId = recurrence !== 'none'
+    ? (typeof item.recurrenceId === 'string' && item.recurrenceId ? item.recurrenceId : item.id)
+    : null;
   const createdAt = typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString();
   const updatedAt = typeof item.updatedAt === 'string' ? item.updatedAt : createdAt;
   return {
@@ -146,6 +151,8 @@ function parseTask(value: unknown): Task | null {
     dueDate,
     remindAt,
     notifiedAt,
+    recurrence,
+    recurrenceId,
     completedAt: typeof item.completedAt === 'string' ? item.completedAt : null,
     createdAt,
     updatedAt,
@@ -194,6 +201,56 @@ function parseState(raw: string): PersistedState {
 
 function cloneState(state: PersistedState): PersistedState {
   return structuredClone(state);
+}
+
+function nextSortOrder(tasks: Task[]): number {
+  return tasks.reduce((max, task) => Math.max(max, task.sortOrder), -1000) + 1000;
+}
+
+function nextRecurringOccurrence(task: Task, after = new Date()): Pick<Task, 'dueDate' | 'remindAt'> | null {
+  if (!isRecurring(task.recurrence)) return null;
+  if (task.remindAt) {
+    const nextReminder = advanceTimestampAfter(task.remindAt, task.recurrence, after);
+    if (!nextReminder) return null;
+    return {
+      remindAt: nextReminder.value,
+      dueDate: task.dueDate ? advanceDateKeyBySteps(task.dueDate, task.recurrence, nextReminder.steps) : null,
+    };
+  }
+  if (task.dueDate) {
+    const nextDate = advanceDateKeyAfter(task.dueDate, task.recurrence, after);
+    if (!nextDate) return null;
+    return { dueDate: nextDate.value, remindAt: null };
+  }
+  return null;
+}
+
+function ensureNextRecurringTask(draft: PersistedState, task: Task, now = new Date()): void {
+  if (!isRecurring(task.recurrence)) return;
+  const next = nextRecurringOccurrence(task, now);
+  if (!next) return;
+  const recurrenceId = task.recurrenceId ?? task.id;
+  const exists = draft.tasks.some((item) => (
+    item.id !== task.id
+    && item.recurrenceId === recurrenceId
+    && item.recurrence === task.recurrence
+    && item.dueDate === next.dueDate
+    && item.remindAt === next.remindAt
+  ));
+  if (exists) return;
+  const createdAt = now.toISOString();
+  draft.tasks.push({
+    ...task,
+    id: crypto.randomUUID(),
+    dueDate: next.dueDate,
+    remindAt: next.remindAt,
+    notifiedAt: null,
+    completedAt: null,
+    createdAt,
+    updatedAt: createdAt,
+    sortOrder: nextSortOrder(draft.tasks),
+    recurrenceId,
+  });
 }
 
 function isProcessAlive(pid: number): boolean {
@@ -305,33 +362,37 @@ export class TaskStore {
     return this.getSnapshot();
   }
 
-  createTask(baseRevision: number, input: { title: string; notes?: string; dueDate?: string | null; remindAt?: string | null }): Promise<StoreSnapshot> {
+  createTask(baseRevision: number, input: { title: string; notes?: string; dueDate?: string | null; remindAt?: string | null; recurrence?: RecurrenceFrequency }): Promise<StoreSnapshot> {
     const title = input.title.trim();
     if (!title || title.length > 300) return Promise.reject(new Error('任务标题长度必须为 1 到 300 个字符。'));
     if (!isValidDateKey(input.dueDate ?? null)) return Promise.reject(new Error('截止日期格式无效。'));
     if (!isValidTimestamp(input.remindAt ?? null)) return Promise.reject(new Error('提醒时间格式无效。'));
+    const recurrence = input.recurrence && isRecurrenceFrequency(input.recurrence) ? input.recurrence : 'none';
     return this.mutate(baseRevision, (draft) => {
       const now = new Date().toISOString();
-      const nextOrder = draft.tasks.reduce((max, task) => Math.max(max, task.sortOrder), -1000) + 1000;
+      const id = crypto.randomUUID();
       draft.tasks.push({
-        id: crypto.randomUUID(),
+        id,
         title,
         notes: (input.notes ?? '').slice(0, 10_000),
         dueDate: input.dueDate ?? null,
         remindAt: input.remindAt ?? null,
         notifiedAt: null,
+        recurrence,
+        recurrenceId: recurrence === 'none' ? null : id,
         completedAt: null,
         createdAt: now,
         updatedAt: now,
-        sortOrder: nextOrder,
+        sortOrder: nextSortOrder(draft.tasks),
       });
     });
   }
 
-  updateTask(baseRevision: number, input: { id: string; title?: string; notes?: string; dueDate?: string | null; remindAt?: string | null }): Promise<StoreSnapshot> {
+  updateTask(baseRevision: number, input: { id: string; title?: string; notes?: string; dueDate?: string | null; remindAt?: string | null; recurrence?: RecurrenceFrequency }): Promise<StoreSnapshot> {
     if (input.title !== undefined && (!input.title.trim() || input.title.trim().length > 300)) return Promise.reject(new Error('任务标题长度必须为 1 到 300 个字符。'));
     if (input.dueDate !== undefined && !isValidDateKey(input.dueDate)) return Promise.reject(new Error('截止日期格式无效。'));
     if (input.remindAt !== undefined && !isValidTimestamp(input.remindAt)) return Promise.reject(new Error('提醒时间格式无效。'));
+    if (input.recurrence !== undefined && !isRecurrenceFrequency(input.recurrence)) return Promise.reject(new Error('重复规则无效。'));
     return this.mutate(baseRevision, (draft) => {
       const task = draft.tasks.find(({ id }) => id === input.id);
       if (!task) throw new Error('任务不存在。');
@@ -342,6 +403,11 @@ export class TaskStore {
         task.remindAt = input.remindAt;
         task.notifiedAt = null;
       }
+      if (input.recurrence !== undefined && task.recurrence !== input.recurrence) {
+        task.recurrence = input.recurrence;
+        task.recurrenceId = input.recurrence === 'none' ? null : task.recurrenceId ?? task.id;
+        task.notifiedAt = null;
+      }
       task.updatedAt = new Date().toISOString();
     });
   }
@@ -350,8 +416,10 @@ export class TaskStore {
     return this.mutate(baseRevision, (draft) => {
       const task = draft.tasks.find((item) => item.id === id);
       if (!task) throw new Error('任务不存在。');
-      task.completedAt = completed ? new Date().toISOString() : null;
+      const completedAt = completed ? new Date().toISOString() : null;
+      task.completedAt = completedAt;
       task.updatedAt = new Date().toISOString();
+      if (completedAt) ensureNextRecurringTask(draft, task, new Date(completedAt));
     });
   }
 
@@ -388,6 +456,7 @@ export class TaskStore {
       if (!task || task.completedAt || task.remindAt !== remindAt || task.notifiedAt) return;
       task.notifiedAt = new Date().toISOString();
       task.updatedAt = task.notifiedAt;
+      ensureNextRecurringTask(draft, task, new Date(task.notifiedAt));
     });
   }
 
