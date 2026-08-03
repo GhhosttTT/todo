@@ -14,6 +14,7 @@ import {
   Layers3,
   MonitorDown,
   Plus,
+  Repeat2,
   RotateCcw,
   Search,
   Settings as SettingsIcon,
@@ -25,7 +26,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { shortcutFromKeyInput } from './domain/shortcut';
 import { filterTasks, getViewCounts, localDateKey } from './domain/tasks';
-import type { AppSnapshot, LayoutMode, MutationResult, Task, ViewId } from './types';
+import { recurrenceLabels } from './domain/recurrence';
+import type { AppSnapshot, LayoutMode, MutationResult, RecurrenceFrequency, Task, ViewId } from './types';
 
 const viewMeta = {
   today: { label: 'Today', hint: '今天与逾期', icon: CalendarDays, tone: 'blue' },
@@ -38,7 +40,10 @@ interface DraftTask {
   notes: string;
   dueDate: string;
   remindAt: string;
+  recurrence: RecurrenceFrequency;
 }
+
+const recurrenceOptions: RecurrenceFrequency[] = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
 
 function dueDateForView(view: ViewId): string {
   if (view === 'today') return localDateKey();
@@ -74,9 +79,9 @@ function App() {
   const [todayKey, setTodayKey] = useState(localDateKey());
   const [query, setQuery] = useState('');
   const [composerOpen, setComposerOpen] = useState(false);
-  const [composer, setComposer] = useState<DraftTask>({ title: '', notes: '', dueDate: '', remindAt: '' });
+  const [composer, setComposer] = useState<DraftTask>({ title: '', notes: '', dueDate: '', remindAt: '', recurrence: 'none' });
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<DraftTask>({ title: '', notes: '', dueDate: '', remindAt: '' });
+  const [draft, setDraft] = useState<DraftTask>({ title: '', notes: '', dueDate: '', remindAt: '', recurrence: 'none' });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutDraft, setShortcutDraft] = useState('Ctrl+Alt+T');
   const [shortcutRecording, setShortcutRecording] = useState(false);
@@ -159,7 +164,7 @@ function App() {
   };
 
   const openComposer = () => {
-    setComposer({ title: '', notes: '', dueDate: dueDateForView(view), remindAt: '' });
+    setComposer({ title: '', notes: '', dueDate: dueDateForView(view), remindAt: '', recurrence: 'none' });
     setComposerOpen(true);
     setEditingId(null);
   };
@@ -170,18 +175,19 @@ function App() {
       ...composer,
       dueDate: composer.dueDate || null,
       remindAt: fromDateTimeInput(composer.remindAt),
+      recurrence: composer.recurrence,
       baseRevision: snapshot.revision,
     });
     if (applyResult(result)) {
       setComposerOpen(false);
-      setComposer({ title: '', notes: '', dueDate: '', remindAt: '' });
+      setComposer({ title: '', notes: '', dueDate: '', remindAt: '', recurrence: 'none' });
     }
   };
 
   const beginEdit = (task: Task) => {
     if (!editing) return;
     setEditingId(task.id);
-    setDraft({ title: task.title, notes: task.notes, dueDate: task.dueDate ?? '', remindAt: toDateTimeInput(task.remindAt) });
+    setDraft({ title: task.title, notes: task.notes, dueDate: task.dueDate ?? '', remindAt: toDateTimeInput(task.remindAt), recurrence: task.recurrence });
     setComposerOpen(false);
   };
 
@@ -193,6 +199,7 @@ function App() {
       notes: draft.notes,
       dueDate: draft.dueDate || null,
       remindAt: fromDateTimeInput(draft.remindAt),
+      recurrence: draft.recurrence,
       baseRevision: snapshot.revision,
     });
     if (applyResult(result)) setEditingId(null);
@@ -403,6 +410,7 @@ function App() {
                 <div className="editor-footer">
                   <label><CalendarDays size={15} /><input type="date" value={composer.dueDate} onChange={(event) => setComposer({ ...composer, dueDate: event.target.value })} /></label>
                   <label><Clock3 size={15} /><input type="datetime-local" value={composer.remindAt} onChange={(event) => setComposer({ ...composer, remindAt: event.target.value })} /></label>
+                  <label><Repeat2 size={15} /><select value={composer.recurrence} onChange={(event) => setComposer({ ...composer, recurrence: event.target.value as RecurrenceFrequency })}>{recurrenceOptions.map((option) => <option key={option} value={option}>{recurrenceLabels[option]}</option>)}</select></label>
                   <span />
                   <button className="text-button" onClick={() => setComposerOpen(false)}>取消</button>
                   <button className="text-button primary" disabled={!composer.title.trim()} onClick={() => void createTask()}>添加</button>
@@ -441,6 +449,7 @@ function App() {
                       <div className="editor-footer">
                         <label><CalendarDays size={15} /><input type="date" value={draft.dueDate} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value })} /></label>
                         <label><Clock3 size={15} /><input type="datetime-local" value={draft.remindAt} onChange={(event) => setDraft({ ...draft, remindAt: event.target.value })} /></label>
+                        <label><Repeat2 size={15} /><select value={draft.recurrence} onChange={(event) => setDraft({ ...draft, recurrence: event.target.value as RecurrenceFrequency })}>{recurrenceOptions.map((option) => <option key={option} value={option}>{recurrenceLabels[option]}</option>)}</select></label>
                         <button className="danger-icon" onClick={() => void deleteTask(task.id)} title="删除任务"><Trash2 size={16} /></button>
                         <button className="text-button" onClick={() => setEditingId(null)}>取消</button>
                         <button className="text-button primary" disabled={!draft.title.trim()} onClick={() => void saveTask()}>保存</button>
@@ -449,13 +458,14 @@ function App() {
                   ) : (
                     <button className="task-content" disabled={!editing} onClick={() => beginEdit(task)}>
                       <span className="task-title">{task.title}</span>
-                      {(task.notes || task.dueDate || task.remindAt) && (
+                      {(task.notes || task.dueDate || task.remindAt || task.recurrence !== 'none') && (
                         <span className="task-meta">
                           {task.notes && <span className="task-notes">{task.notes}</span>}
-                          {(task.dueDate || task.remindAt) && (
+                          {(task.dueDate || task.remindAt || task.recurrence !== 'none') && (
                             <span className="task-timing-row">
                               {task.dueDate && <span className={task.dueDate < todayKey && !task.completedAt ? 'overdue' : ''}><CalendarDays size={13} />{task.dueDate}</span>}
                               {task.remindAt && <span><Clock3 size={13} />{formatReminder(task.remindAt)}</span>}
+                              {task.recurrence !== 'none' && <span><Repeat2 size={13} />{recurrenceLabels[task.recurrence]}</span>}
                             </span>
                           )}
                         </span>

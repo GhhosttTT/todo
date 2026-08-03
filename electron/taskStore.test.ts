@@ -105,6 +105,54 @@ describe('TaskStore', () => {
     expect(changed.tasks[0].notifiedAt).toBeNull();
   });
 
+  it('creates the next occurrence when a recurring task is completed', async () => {
+    const store = createStore();
+    store.load();
+    const created = await store.createTask(0, {
+      title: 'Daily review',
+      dueDate: '2026-08-10',
+      remindAt: '2026-08-10T02:00:00.000Z',
+      recurrence: 'daily',
+    });
+
+    const completed = await store.setCompleted(created.revision, created.tasks[0].id, true);
+
+    expect(completed.tasks).toHaveLength(2);
+    expect(completed.tasks[0]).toMatchObject({ completedAt: expect.any(String), recurrence: 'daily' });
+    expect(completed.tasks[1]).toMatchObject({
+      title: 'Daily review',
+      dueDate: '2026-08-11',
+      remindAt: '2026-08-11T02:00:00.000Z',
+      recurrence: 'daily',
+      recurrenceId: completed.tasks[0].recurrenceId,
+      completedAt: null,
+      notifiedAt: null,
+    });
+  });
+
+  it('creates the next occurrence when a recurring reminder is notified even if it is not completed', async () => {
+    const store = createStore();
+    store.load();
+    const created = await store.createTask(0, {
+      title: 'Weekly reminder',
+      dueDate: '2026-08-10',
+      remindAt: '2026-08-10T02:00:00.000Z',
+      recurrence: 'weekly',
+    });
+
+    const notified = await store.markReminderNotified(created.tasks[0].id, '2026-08-10T02:00:00.000Z');
+
+    expect(notified.tasks).toHaveLength(2);
+    expect(notified.tasks[0]).toMatchObject({ completedAt: null, notifiedAt: expect.any(String) });
+    expect(notified.tasks[1]).toMatchObject({
+      dueDate: '2026-08-17',
+      remindAt: '2026-08-17T02:00:00.000Z',
+      recurrence: 'weekly',
+      completedAt: null,
+      notifiedAt: null,
+    });
+  });
+
   it('rejects stale revisions', async () => {
     const store = createStore();
     store.load();

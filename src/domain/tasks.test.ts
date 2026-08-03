@@ -9,6 +9,8 @@ const task = (id: string, dueDate: string | null, completed = false, title = id)
   dueDate,
   remindAt: null,
   notifiedAt: null,
+  recurrence: 'none',
+  recurrenceId: null,
   completedAt: completed ? '2026-07-13T10:00:00.000Z' : null,
   createdAt: `2026-07-13T00:00:0${id.length}.000Z`,
   updatedAt: '2026-07-13T00:00:00.000Z',

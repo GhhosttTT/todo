@@ -4,6 +4,7 @@ export type Theme = 'light' | 'dark';
 export type LayoutMode = 'expanded' | 'compact';
 export type NotificationTimeoutType = 'default' | 'custom' | 'never';
 export type WindowMode = 'starting' | 'viewing-desktop' | 'viewing-fallback' | 'entering-editing' | 'editing' | 'exiting-editing' | 'rebinding' | 'hidden';
+export type RecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export interface Task {
   id: string;
@@ -12,6 +13,8 @@ export interface Task {
   dueDate: string | null;
   remindAt: string | null;
   notifiedAt: string | null;
+  recurrence: RecurrenceFrequency;
+  recurrenceId: string | null;
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -75,6 +78,7 @@ export interface CreateTaskInput {
   notes?: string;
   dueDate?: string | null;
   remindAt?: string | null;
+  recurrence?: RecurrenceFrequency;
   baseRevision: number;
 }
 
@@ -84,6 +88,7 @@ export interface UpdateTaskInput {
   notes?: string;
   dueDate?: string | null;
   remindAt?: string | null;
+  recurrence?: RecurrenceFrequency;
   baseRevision: number;
 }
 

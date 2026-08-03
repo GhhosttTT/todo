@@ -45,6 +45,8 @@ function task(remindAt: string, overrides: Partial<Task> = {}): Task {
     dueDate: null,
     remindAt,
     notifiedAt: null,
+    recurrence: 'none',
+    recurrenceId: null,
     completedAt: null,
     createdAt: '2026-07-21T01:00:00.000Z',
     updatedAt: '2026-07-21T01:00:00.000Z',
@@ -165,5 +167,33 @@ describe('ReminderScheduler', () => {
     await vi.advanceTimersByTimeAsync(2_000);
 
     expect(notificationMock.instances).toHaveLength(0);
+  });
+
+  it('creates the next recurring reminder after a notification fires', async () => {
+    const tasks = [task('2026-07-21T02:00:01.000Z', {
+      recurrence: 'daily',
+      recurrenceId: 'series-1',
+    })];
+    const markReminderNotified = vi.fn(async () => {
+      tasks[0].notifiedAt = new Date().toISOString();
+      tasks.push(task('2026-07-22T02:00:01.000Z', {
+        id: 'next-reminder',
+        recurrence: 'daily',
+        recurrenceId: 'series-1',
+      }));
+      return { tasks };
+    });
+    const store = {
+      getSnapshot: () => ({ tasks, settings: { notificationTimeoutType: 'default' } }),
+      markReminderNotified,
+    };
+    const scheduler = new ReminderScheduler(store as never, vi.fn(), vi.fn());
+
+    scheduler.scheduleAll();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(notificationMock.instances).toHaveLength(1);
+    expect(markReminderNotified).toHaveBeenCalledWith('reminder-task', '2026-07-21T02:00:01.000Z');
+    expect(tasks.some((item) => item.id === 'next-reminder')).toBe(true);
   });
 });
