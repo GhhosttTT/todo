@@ -1,7 +1,9 @@
-import { addDays, format } from 'date-fns';
+import { addDays, addMonths, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek } from 'date-fns';
 import {
   CalendarDays,
   Check,
+  ChevronLeft,
+  ChevronRight,
   CircleAlert,
   CirclePlus,
   Clock3,
@@ -36,6 +38,7 @@ interface DraftTask {
 }
 
 const recurrenceOptions: RecurrenceFrequency[] = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
+const eventToneClasses = ['red', 'blue', 'green', 'amber', 'violet'];
 
 function toDateTimeInput(value: string | null): string {
   if (!value) return '';
@@ -63,6 +66,12 @@ function formatAgendaTime(value: string | null): string {
 function dateFromKey(dateKey: string): Date {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(year, month - 1, day);
+}
+
+function eventTone(task: Task): string {
+  if (task.completedAt) return 'completed';
+  const seed = Array.from(task.id || task.title).reduce((total, char) => total + char.charCodeAt(0), 0);
+  return eventToneClasses[seed % eventToneClasses.length];
 }
 
 function taskCalendarDate(task: Task): string | null {
@@ -180,6 +189,37 @@ function App() {
   const selectedDateObject = useMemo(() => dateFromKey(selectedDate), [selectedDate]);
   const selectedDateLabel = useMemo(() => format(selectedDateObject, 'yyyy年 MM月dd日'), [selectedDateObject]);
   const selectedWeekLabel = useMemo(() => format(selectedDateObject, 'EEEE'), [selectedDateObject]);
+  const monthCells = useMemo(() => {
+    const gridStart = startOfWeek(startOfMonth(selectedDateObject));
+    const gridEnd = endOfWeek(endOfMonth(selectedDateObject));
+    const cells: Date[] = [];
+    for (let cursor = gridStart; cursor <= gridEnd; cursor = addDays(cursor, 1)) {
+      cells.push(cursor);
+    }
+    return cells;
+  }, [selectedDateObject]);
+  const tasksByDate = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+    const grouped = new Map<string, Task[]>();
+    snapshot?.tasks
+      .filter((task) => snapshot.settings.showCompleted || !task.completedAt)
+      .filter((task) => !normalizedQuery || task.title.toLocaleLowerCase().includes(normalizedQuery) || task.notes.toLocaleLowerCase().includes(normalizedQuery))
+      .forEach((task) => {
+        const key = taskCalendarDate(task);
+        if (!key) return;
+        const tasks = grouped.get(key) ?? [];
+        tasks.push(task);
+        grouped.set(key, tasks);
+      });
+    grouped.forEach((tasks) => tasks.sort((left, right) => {
+      if (Boolean(left.completedAt) !== Boolean(right.completedAt)) return left.completedAt ? 1 : -1;
+      const leftTime = left.remindAt ? Date.parse(left.remindAt) : Number.MAX_SAFE_INTEGER;
+      const rightTime = right.remindAt ? Date.parse(right.remindAt) : Number.MAX_SAFE_INTEGER;
+      if (leftTime !== rightTime) return leftTime - rightTime;
+      return left.sortOrder - right.sortOrder || left.createdAt.localeCompare(right.createdAt);
+    }));
+    return grouped;
+  }, [query, snapshot]);
 
   useEffect(() => {
     if (editing) return;
@@ -192,6 +232,20 @@ function App() {
   const openComposer = () => {
     setComposer({ title: '', notes: '', dueDate: selectedDate, remindAt: defaultReminderForDate(selectedDate), recurrence: 'none' });
     setComposerOpen(true);
+    setEditingId(null);
+  };
+
+  const selectMonthOffset = (offset: number) => {
+    const target = addMonths(selectedDateObject, offset);
+    setSelectedDate(format(target, 'yyyy-MM-dd'));
+    setQuery('');
+    setComposerOpen(false);
+    setEditingId(null);
+  };
+
+  const selectDay = (dateKey: string) => {
+    setSelectedDate(dateKey);
+    setComposerOpen(false);
     setEditingId(null);
   };
 
@@ -368,77 +422,110 @@ function App() {
       className={`app-shell calendar-widget theme-${snapshot.settings.theme} layout-${snapshot.settings.layoutMode} ${editing ? 'is-editing' : 'is-viewing'}`}
       style={{ '--surface-opacity': snapshot.settings.opacity, '--background-intensity': snapshot.settings.backgroundIntensity } as React.CSSProperties}
     >
-      <aside className="sidebar calendar-sidebar">
+      <aside className="sidebar calendar-toolbar">
         <div className="drag-strip calendar-drag-strip" aria-hidden="true" />
 
-        <section className="calendar-date-plate" aria-label="当前日期">
-          <div>
-            <span>{format(selectedDateObject, 'MMM yyyy')}</span>
-            <strong>{format(selectedDateObject, 'dd')}</strong>
+        <div className="calendar-toolbar-main">
+          <button className="toolbar-command today-command" onClick={() => selectDay(todayKey)}>Today</button>
+          <div className="month-switcher">
+            <button className="icon-button" onClick={() => selectMonthOffset(-1)} title="上个月"><ChevronLeft size={18} /></button>
+            <strong>{format(selectedDateObject, 'MMMM yyyy')}</strong>
+            <button className="icon-button" onClick={() => selectMonthOffset(1)} title="下个月"><ChevronRight size={18} /></button>
           </div>
-          <p>{selectedWeekLabel}</p>
-        </section>
 
-        {editing && (
-          <label className="search-box">
-            <Search size={18} strokeWidth={2.2} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索任务" aria-label="搜索任务" />
-            {query && <button className="icon-button compact" onClick={() => setQuery('')} title="清除搜索"><X size={15} /></button>}
-          </label>
-        )}
+          {editing && (
+            <label className="search-box calendar-search-box">
+              <Search size={18} strokeWidth={2.2} />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索提醒" aria-label="搜索提醒" />
+              {query && <button className="icon-button compact" onClick={() => setQuery('')} title="清除搜索"><X size={15} /></button>}
+            </label>
+          )}
 
-        <nav className="calendar-day-grid" aria-label="提醒日期">
-          {calendarDays.map((day, index) => {
-            const count = dateCounts.get(day.key) ?? 0;
-            return (
-              <button
-                key={day.key}
-                className={`calendar-day-cell ${selectedDate === day.key ? 'active' : ''} ${day.key === todayKey ? 'today' : ''}`}
-                onClick={() => { setSelectedDate(day.key); setQuery(''); setComposerOpen(false); setEditingId(null); }}
-              >
-                <span>{index === 0 ? 'Today' : day.week}</span>
-                <strong>{day.day}</strong>
-                {calendarRangeDays === 30 && <em>{day.month}</em>}
-                {count > 0 && <small>{count}</small>}
+          {editing ? (
+            <div className="toolbar-actions">
+              <button aria-label="打开设置" className={`sidebar-command ${runtimeWarning ? 'has-warning' : ''}`} onClick={() => setSettingsOpen(true)}>
+                <SettingsIcon size={18} />
+                <span>设置</span>
               </button>
-            );
-          })}
-        </nav>
-
-        <div className="sidebar-spacer" />
-        {editing ? (
-          <div className="sidebar-actions">
-            <button aria-label="打开设置" className={`sidebar-command ${runtimeWarning ? 'has-warning' : ''}`} onClick={() => setSettingsOpen(true)}>
-              <SettingsIcon size={18} />
-              <span>设置与状态</span>
-            </button>
-            <button className="sidebar-command primary" onClick={() => void exitEditing()}>
-              <Check size={18} />
-              <span>完成编辑</span>
-            </button>
-          </div>
-        ) : (
-          <div className="shortcut-hint" aria-label={`按 ${snapshot.settings.globalShortcut} 进入编辑模式`}>
-            <Keyboard size={13} />
-            <kbd>{snapshot.settings.globalShortcut}</kbd>
-          </div>
-        )}
+              <button className="sidebar-command primary" onClick={() => void exitEditing()}>
+                <Check size={18} />
+                <span>完成</span>
+              </button>
+            </div>
+          ) : (
+            <div className="shortcut-hint" aria-label={`按 ${snapshot.settings.globalShortcut} 进入编辑模式`}>
+              <Keyboard size={13} />
+              <kbd>{snapshot.settings.globalShortcut}</kbd>
+            </div>
+          )}
+        </div>
       </aside>
 
-      <main className="task-pane calendar-agenda-pane">
-        <header className="pane-header calendar-agenda-header">
-          <div>
-            <span className="calendar-eyebrow">Calendar reminder</span>
-            <h1>{selectedDate === todayKey ? 'Today' : format(selectedDateObject, 'MMM d')}</h1>
-            <p>{selectedDateLabel} · {visibleTasks.length} 个提醒 · 未来 {calendarRangeDays} 天</p>
+      <main className="task-pane calendar-month-pane">
+        <section className="calendar-month-board" aria-label="月历">
+          <div className="calendar-week-header">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((week) => <span key={week}>{week}</span>)}
           </div>
-          <div className="agenda-header-side">
-            <span><Clock3 size={15} />{visibleTasks.length}</span>
-            {editing && <button className="icon-button add-button" onClick={openComposer} title="添加提醒"><Plus size={24} /></button>}
-          </div>
-        </header>
 
-        <section className="task-scroll calendar-agenda-scroll" aria-live="polite">
+          <div className="calendar-month-grid">
+            {monthCells.map((date) => {
+              const dateKey = format(date, 'yyyy-MM-dd');
+              const dayTasks = tasksByDate.get(dateKey) ?? [];
+              const overflowCount = Math.max(0, dayTasks.length - 3);
+              return (
+                <div
+                  key={dateKey}
+                  className={`calendar-month-cell ${selectedDate === dateKey ? 'active' : ''} ${dateKey === todayKey ? 'today' : ''} ${isSameMonth(date, selectedDateObject) ? '' : 'outside-month'}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => selectDay(dateKey)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      selectDay(dateKey);
+                    }
+                  }}
+                >
+                  <div className="month-cell-head">
+                    <span>{format(date, 'd')}</span>
+                    {dateKey === todayKey && <em>Today</em>}
+                  </div>
+                  <div className="month-event-stack">
+                    {dayTasks.slice(0, 3).map((task) => (
+                      <button
+                        key={task.id}
+                        className={`month-event-pill ${eventTone(task)}`}
+                        disabled={!editing}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedDate(dateKey);
+                          beginEdit(task);
+                        }}
+                        title={task.title}
+                      >
+                        {task.remindAt && <span>{formatAgendaTime(task.remindAt)}</span>}
+                        <strong>{task.title}</strong>
+                      </button>
+                    ))}
+                    {overflowCount > 0 && <small className="month-event-more">+{overflowCount} more</small>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <aside className="day-agenda-panel" aria-label="选中日期提醒">
+          <header className="day-agenda-header">
+            <div>
+              <span>{selectedWeekLabel}</span>
+              <h1>{format(selectedDateObject, 'MMM d')}</h1>
+              <p>{selectedDateLabel} · {visibleTasks.length} 个提醒</p>
+            </div>
+            {editing && <button className="icon-button add-button" onClick={openComposer} title="添加提醒"><Plus size={24} /></button>}
+          </header>
+
+          <section className="task-scroll calendar-agenda-scroll" aria-live="polite">
           {composerOpen && (
             <div className="composer calendar-composer">
               <span className="agenda-time-label">NEW</span>
@@ -519,7 +606,8 @@ function App() {
               ))}
             </div>
           )}
-        </section>
+          </section>
+        </aside>
       </main>
 
       {!editing && snapshot.settings.layoutMode === 'compact' && (
