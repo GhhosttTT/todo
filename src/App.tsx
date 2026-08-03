@@ -34,6 +34,7 @@ interface DraftTask {
 
 const recurrenceOptions: RecurrenceFrequency[] = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
 const eventToneClasses = ['red', 'blue', 'green', 'amber', 'violet'];
+const weekdayLabels = ['日', '一', '二', '三', '四', '五', '六'];
 
 function toDateTimeInput(value: string | null): string {
   if (!value) return '';
@@ -56,6 +57,36 @@ function formatAgendaTime(value: string | null): string {
   if (!value) return '全天';
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? format(date, 'HH:mm') : '全天';
+}
+
+function taskAnchorDate(task: Task): Date | null {
+  if (task.remindAt) {
+    const date = new Date(task.remindAt);
+    if (Number.isFinite(date.getTime())) return date;
+  }
+  if (task.dueDate) {
+    const [year, month, day] = task.dueDate.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    if (Number.isFinite(date.getTime())) return date;
+  }
+  return null;
+}
+
+function formatTaskSchedule(task: Task): string {
+  const anchor = taskAnchorDate(task);
+  const time = task.remindAt ? formatAgendaTime(task.remindAt) : '';
+  const suffix = time ? ` ${time} 提示` : ' 提示';
+  if (task.recurrence === 'daily') return `每天${suffix}`;
+  if (task.recurrence === 'weekly' && anchor) return `每周${weekdayLabels[anchor.getDay()]}${suffix}`;
+  if (task.recurrence === 'monthly' && anchor) return `每月 ${anchor.getDate()} 日${suffix}`;
+  if (task.recurrence === 'yearly' && anchor) return `每年 ${anchor.getMonth() + 1} 月 ${anchor.getDate()} 日${suffix}`;
+  if (task.remindAt) return formatReminder(task.remindAt);
+  return task.dueDate ?? '未设置时间';
+}
+
+function formatMonthEventPrefix(task: Task): string {
+  if (task.recurrence !== 'none') return recurrenceLabels[task.recurrence];
+  return task.remindAt ? formatAgendaTime(task.remindAt) : '';
 }
 
 function dateFromKey(dateKey: string): Date {
@@ -434,7 +465,7 @@ function App() {
                         onClick={() => selectDay(dateKey)}
                         title={task.title}
                       >
-                        {task.remindAt && <span>{formatAgendaTime(task.remindAt)}</span>}
+                        {formatMonthEventPrefix(task) && <span>{formatMonthEventPrefix(task)}</span>}
                         <strong>{task.title}</strong>
                       </button>
                     ))}
@@ -460,8 +491,8 @@ function App() {
               <input autoFocus className="title-input" value={composer.title} onChange={(event) => setComposer({ ...composer, title: event.target.value })} onKeyDown={(event) => { if (event.key === 'Enter') void createTask(); }} placeholder="新提醒" maxLength={300} />
               <textarea value={composer.notes} onChange={(event) => setComposer({ ...composer, notes: event.target.value })} placeholder="备注（可选）" maxLength={10000} />
               <div className="editor-footer">
-                <label><CalendarDays size={15} /><input type="date" value={composer.dueDate} onChange={(event) => setComposer({ ...composer, dueDate: event.target.value })} /></label>
-                <label><Clock3 size={15} /><input type="datetime-local" value={composer.remindAt} onChange={(event) => setComposer({ ...composer, remindAt: event.target.value })} /></label>
+                <label><CalendarDays size={15} /><span>{composer.recurrence === 'none' ? '日期' : '起始日期'}</span><input type="date" value={composer.dueDate} onChange={(event) => setComposer({ ...composer, dueDate: event.target.value })} /></label>
+                <label><Clock3 size={15} /><span>{composer.recurrence === 'none' ? '提醒时间' : '提示时间'}</span><input type="datetime-local" value={composer.remindAt} onChange={(event) => setComposer({ ...composer, remindAt: event.target.value })} /></label>
                 <label><Repeat2 size={15} /><select value={composer.recurrence} onChange={(event) => setComposer({ ...composer, recurrence: event.target.value as RecurrenceFrequency })}>{recurrenceOptions.map((option) => <option key={option} value={option}>{recurrenceLabels[option]}</option>)}</select></label>
                 <span />
                 <button className="text-button" onClick={() => setComposerOpen(false)}>取消</button>
@@ -489,10 +520,11 @@ function App() {
                   <div className="day-empty">这一天还没有提醒。</div>
                 ) : selectedDayTasks.map((task) => (
                   <button key={task.id} className={`day-event-item ${editingId === task.id ? 'active' : ''} ${task.completedAt ? 'completed' : ''}`} onClick={() => editing ? beginEdit(task) : setEditingId(task.id)}>
-                    <time>{formatAgendaTime(task.remindAt)}</time>
+                    <time>{task.recurrence === 'none' ? formatAgendaTime(task.remindAt) : recurrenceLabels[task.recurrence]}</time>
                     <span>
                       <strong>{task.title}</strong>
-                      {(task.notes || task.recurrence !== 'none') && <small>{task.notes || recurrenceLabels[task.recurrence]}</small>}
+                      <small>{formatTaskSchedule(task)}</small>
+                      {task.notes && <small>{task.notes}</small>}
                     </span>
                   </button>
                 ))}
@@ -505,8 +537,8 @@ function App() {
                     <input autoFocus className="title-input" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} maxLength={300} />
                     <textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="备注（可选）" maxLength={10000} />
                     <div className="editor-footer">
-                      <label><CalendarDays size={15} /><input type="date" value={draft.dueDate} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value })} /></label>
-                      <label><Clock3 size={15} /><input type="datetime-local" value={draft.remindAt} onChange={(event) => setDraft({ ...draft, remindAt: event.target.value })} /></label>
+                      <label><CalendarDays size={15} /><span>{draft.recurrence === 'none' ? '日期' : '起始日期'}</span><input type="date" value={draft.dueDate} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value })} /></label>
+                      <label><Clock3 size={15} /><span>{draft.recurrence === 'none' ? '提醒时间' : '提示时间'}</span><input type="datetime-local" value={draft.remindAt} onChange={(event) => setDraft({ ...draft, remindAt: event.target.value })} /></label>
                       <label><Repeat2 size={15} /><select value={draft.recurrence} onChange={(event) => setDraft({ ...draft, recurrence: event.target.value as RecurrenceFrequency })}>{recurrenceOptions.map((option) => <option key={option} value={option}>{recurrenceLabels[option]}</option>)}</select></label>
                       {!selectedTask.completedAt && <button className="completion-action" onClick={() => void toggleCompleted(selectedTask)}>完成</button>}
                       {selectedTask.completedAt && <span className="completed-lock">已完成</span>}
@@ -520,9 +552,7 @@ function App() {
                       <h3>{selectedTask.title}</h3>
                       {selectedTask.notes && <p>{selectedTask.notes}</p>}
                       <div className="task-timing-row">
-                        {selectedTask.dueDate && <span><CalendarDays size={13} />{selectedTask.dueDate}</span>}
-                        {selectedTask.remindAt && <span><Clock3 size={13} />{formatReminder(selectedTask.remindAt)}</span>}
-                        {selectedTask.recurrence !== 'none' && <span><Repeat2 size={13} />{recurrenceLabels[selectedTask.recurrence]}</span>}
+                        <span>{selectedTask.recurrence === 'none' ? <CalendarDays size={13} /> : <Repeat2 size={13} />}{formatTaskSchedule(selectedTask)}</span>
                       </div>
                     </div>
                   )
