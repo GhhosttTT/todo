@@ -33,30 +33,18 @@ describe('TaskStore', () => {
     expect(store.load().settings.windowBounds).toMatchObject({ x: 10, y: 20, width: 760, height: 1200 });
   });
 
-  it('clamps undersized compact bounds while keeping separate layout state', async () => {
+  it('forces old compact layout data back to expanded for the calendar view', () => {
     const store = createStore();
+    writeFileSync(store.stateFile, JSON.stringify({
+      schemaVersion: 4,
+      revision: 1,
+      tasks: [],
+      settings: { layoutMode: 'compact', compactWindowBounds: { x: 1320, y: 180, width: 460, height: 700 } },
+    }), 'utf8');
+
     const loaded = store.load();
-    const changed = await store.updateSettings(loaded.revision, {
-      layoutMode: 'compact',
-      compactWindowBounds: { x: 1320, y: 180, width: 120, height: 240 },
-    });
-
-    expect(changed.settings.layoutMode).toBe('compact');
-    expect(changed.settings.compactWindowBounds).toMatchObject({ x: 1320, y: 180, width: 360, height: 480 });
-    expect(new TaskStore(store.stateFile).load().settings.compactWindowBounds).toMatchObject({ x: 1320, y: 180, width: 360, height: 480 });
-  });
-
-  it('persists resized compact bounds independently from expanded bounds', async () => {
-    const store = createStore();
-    const loaded = store.load();
-    const changed = await store.updateSettings(loaded.revision, {
-      layoutMode: 'compact',
-      compactWindowBounds: { x: 1320, y: 180, width: 460, height: 700 },
-    });
-
-    expect(changed.settings.compactWindowBounds).toMatchObject({ x: 1320, y: 180, width: 460, height: 700 });
-    expect(changed.settings.windowBounds).toMatchObject({ width: 900, height: 620 });
-    expect(new TaskStore(store.stateFile).load().settings.compactWindowBounds).toMatchObject({ x: 1320, y: 180, width: 460, height: 700 });
+    expect(loaded.settings.layoutMode).toBe('expanded');
+    expect(loaded.settings.compactWindowBounds).toMatchObject({ x: 1320, y: 180, width: 460, height: 700 });
   });
 
   it('uses light theme by default and persists a dark theme choice', async () => {
@@ -128,6 +116,15 @@ describe('TaskStore', () => {
       completedAt: null,
       notifiedAt: null,
     });
+  });
+
+  it('does not allow completed tasks to be restored', async () => {
+    const store = createStore();
+    store.load();
+    const created = await store.createTask(0, { title: 'Finished reminder' });
+    const completed = await store.setCompleted(created.revision, created.tasks[0].id, true);
+
+    await expect(store.setCompleted(completed.revision, completed.tasks[0].id, false)).rejects.toThrow('已完成的任务不可恢复。');
   });
 
   it('creates the next occurrence when a recurring reminder is notified even if it is not completed', async () => {

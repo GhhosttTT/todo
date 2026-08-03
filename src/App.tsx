@@ -8,8 +8,6 @@ import {
   Clock3,
   HardDrive,
   Keyboard,
-  LayoutPanelLeft,
-  LayoutPanelTop,
   MonitorDown,
   Plus,
   Repeat2,
@@ -25,7 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { shortcutFromKeyInput } from './domain/shortcut';
 import { localDateKey } from './domain/tasks';
 import { recurrenceLabels } from './domain/recurrence';
-import type { AppSnapshot, LayoutMode, MutationResult, RecurrenceFrequency, Task } from './types';
+import type { AppSnapshot, MutationResult, RecurrenceFrequency, Task } from './types';
 
 interface DraftTask {
   title: string;
@@ -98,13 +96,13 @@ function App() {
   const [query, setQuery] = useState('');
   const [composerOpen, setComposerOpen] = useState(false);
   const [composer, setComposer] = useState<DraftTask>({ title: '', notes: '', dueDate: '', remindAt: '', recurrence: 'none' });
+  const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftTask>({ title: '', notes: '', dueDate: '', remindAt: '', recurrence: 'none' });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutDraft, setShortcutDraft] = useState('Ctrl+Alt+T');
   const [shortcutRecording, setShortcutRecording] = useState(false);
   const [shortcutError, setShortcutError] = useState<string | null>(null);
-  const [pendingLayoutMode, setPendingLayoutMode] = useState<LayoutMode | null>(null);
   const [notice, setNotice] = useState<{ text: string; kind: 'error' | 'info'; undoToken?: string } | null>(null);
   const activeTheme = snapshot?.settings.theme;
 
@@ -155,7 +153,6 @@ function App() {
   const editing = snapshot?.runtime.windowMode === 'editing' || snapshot?.runtime.windowMode === 'entering-editing';
   const selectedDateObject = useMemo(() => dateFromKey(selectedDate), [selectedDate]);
   const selectedDateLabel = useMemo(() => format(selectedDateObject, 'yyyy年 MM月dd日'), [selectedDateObject]);
-  const selectedTask = useMemo(() => snapshot?.tasks.find((task) => task.id === editingId) ?? null, [editingId, snapshot?.tasks]);
   const monthCells = useMemo(() => {
     const gridStart = startOfWeek(startOfMonth(selectedDateObject));
     const gridEnd = endOfWeek(endOfMonth(selectedDateObject));
@@ -187,17 +184,21 @@ function App() {
     }));
     return grouped;
   }, [query, snapshot]);
+  const selectedDayTasks = useMemo(() => tasksByDate.get(selectedDate) ?? [], [selectedDate, tasksByDate]);
+  const selectedTask = useMemo(() => selectedDayTasks.find((task) => task.id === editingId) ?? null, [editingId, selectedDayTasks]);
 
   useEffect(() => {
     if (editing) return;
     setSettingsOpen(false);
     setComposerOpen(false);
+    setDayPopoverOpen(false);
     setEditingId(null);
   }, [editing]);
 
   const openComposer = () => {
     setComposer({ title: '', notes: '', dueDate: selectedDate, remindAt: defaultReminderForDate(selectedDate), recurrence: 'none' });
     setComposerOpen(true);
+    setDayPopoverOpen(true);
     setEditingId(null);
   };
 
@@ -213,6 +214,7 @@ function App() {
     setSelectedDate(dateKey);
     setComposerOpen(false);
     setEditingId(null);
+    setDayPopoverOpen(true);
   };
 
   const createTask = async () => {
@@ -232,6 +234,7 @@ function App() {
 
   const beginEdit = (task: Task) => {
     if (!editing) return;
+    setDayPopoverOpen(true);
     setEditingId(task.id);
     setDraft({ title: task.title, notes: task.notes, dueDate: task.dueDate ?? '', remindAt: toDateTimeInput(task.remindAt), recurrence: task.recurrence });
     setComposerOpen(false);
@@ -253,6 +256,7 @@ function App() {
 
   const toggleCompleted = async (task: Task) => {
     if (!snapshot || !editing) return;
+    if (task.completedAt) return;
     applyResult(await window.todo.setTaskCompleted({ id: task.id, completed: !task.completedAt, baseRevision: snapshot.revision }));
   };
 
@@ -274,21 +278,6 @@ function App() {
   const changeSettings = async (settings: Parameters<typeof window.todo.updateSettings>[0]['settings']) => {
     if (!snapshot) return;
     applyResult(await window.todo.updateSettings({ settings, baseRevision: snapshot.revision }));
-  };
-
-  const changeLayoutMode = async (layoutMode: LayoutMode) => {
-    if (!snapshot || snapshot.settings.layoutMode === layoutMode) return;
-    setPendingLayoutMode(layoutMode);
-    try {
-      const latest = await window.todo.getSnapshot();
-      if (latest.settings.layoutMode === layoutMode) {
-        setSnapshot(latest);
-        return;
-      }
-      applyResult(await window.todo.updateSettings({ settings: { layoutMode }, baseRevision: latest.revision }));
-    } finally {
-      setPendingLayoutMode(null);
-    }
   };
 
   const startShortcutCapture = useCallback(async () => {
@@ -373,7 +362,7 @@ function App() {
 
   return (
     <div
-      className={`app-shell calendar-widget theme-${snapshot.settings.theme} layout-${snapshot.settings.layoutMode} ${editing ? 'is-editing' : 'is-viewing'}`}
+      className={`app-shell calendar-widget theme-${snapshot.settings.theme} layout-expanded ${editing ? 'is-editing' : 'is-viewing'}`}
       style={{ '--surface-opacity': snapshot.settings.opacity, '--background-intensity': snapshot.settings.backgroundIntensity } as React.CSSProperties}
     >
       <aside className="sidebar calendar-toolbar">
@@ -449,12 +438,7 @@ function App() {
                       <button
                         key={task.id}
                         className={`month-event-pill ${eventTone(task)}`}
-                        disabled={!editing}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setSelectedDate(dateKey);
-                          beginEdit(task);
-                        }}
+                        onClick={() => selectDay(dateKey)}
                         title={task.title}
                       >
                         {task.remindAt && <span>{formatAgendaTime(task.remindAt)}</span>}
@@ -473,7 +457,7 @@ function App() {
       </main>
 
       {editing && composerOpen && (
-        <div className="event-popover-layer" onClick={() => setComposerOpen(false)}>
+        <div className="event-popover-layer" onClick={() => { setComposerOpen(false); setDayPopoverOpen(false); }}>
           <aside className="event-popover" onClick={(event) => event.stopPropagation()} aria-label="新建提醒">
             <header>
               <div><span>NEW REMINDER</span><h2>{selectedDateLabel}</h2></div>
@@ -495,47 +479,69 @@ function App() {
         </div>
       )}
 
-      {editing && selectedTask && (
-        <div className="event-popover-layer" onClick={() => setEditingId(null)}>
-          <aside className="event-popover" onClick={(event) => event.stopPropagation()} aria-label="编辑提醒">
+      {dayPopoverOpen && !composerOpen && (
+        <div className="event-popover-layer" onClick={() => { setDayPopoverOpen(false); setEditingId(null); }}>
+          <aside className="event-popover day-popover" onClick={(event) => event.stopPropagation()} aria-label="当天提醒">
             <header>
-              <div><span>REMINDER</span><h2>{selectedTask.title}</h2></div>
-              <button className="icon-button" onClick={() => setEditingId(null)} title="关闭"><X size={19} /></button>
+              <div><span>DAY DETAIL</span><h2>{selectedDateLabel}</h2><p>{selectedDayTasks.length} 个提醒</p></div>
+              <div className="popover-header-actions">
+                {editing && <button className="icon-button" onClick={openComposer} title="添加提醒"><Plus size={20} /></button>}
+                <button className="icon-button" onClick={() => { setDayPopoverOpen(false); setEditingId(null); }} title="关闭"><X size={19} /></button>
+              </div>
             </header>
-            <div className="task-editor">
-              <input autoFocus className="title-input" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} maxLength={300} />
-              <textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="备注（可选）" maxLength={10000} />
-              <div className="editor-footer">
-                <label><CalendarDays size={15} /><input type="date" value={draft.dueDate} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value })} /></label>
-                <label><Clock3 size={15} /><input type="datetime-local" value={draft.remindAt} onChange={(event) => setDraft({ ...draft, remindAt: event.target.value })} /></label>
-                <label><Repeat2 size={15} /><select value={draft.recurrence} onChange={(event) => setDraft({ ...draft, recurrence: event.target.value as RecurrenceFrequency })}>{recurrenceOptions.map((option) => <option key={option} value={option}>{recurrenceLabels[option]}</option>)}</select></label>
-                <button className="completion-action" onClick={() => void toggleCompleted(selectedTask)}>{selectedTask.completedAt ? '恢复' : '完成'}</button>
-                <button className="danger-icon" onClick={() => void deleteTask(selectedTask.id)} title="删除任务"><Trash2 size={16} /></button>
-                <button className="text-button" onClick={() => setEditingId(null)}>取消</button>
-                <button className="text-button primary" disabled={!draft.title.trim()} onClick={() => void saveTask()}>保存</button>
+
+            <div className="day-popover-grid">
+              <div className="day-event-list">
+                {selectedDayTasks.length === 0 ? (
+                  <div className="day-empty">这一天还没有提醒。</div>
+                ) : selectedDayTasks.map((task) => (
+                  <button key={task.id} className={`day-event-item ${editingId === task.id ? 'active' : ''} ${task.completedAt ? 'completed' : ''}`} onClick={() => editing ? beginEdit(task) : setEditingId(task.id)}>
+                    <time>{formatAgendaTime(task.remindAt)}</time>
+                    <span>
+                      <strong>{task.title}</strong>
+                      {(task.notes || task.recurrence !== 'none') && <small>{task.notes || recurrenceLabels[task.recurrence]}</small>}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="day-editor-panel">
+                {selectedTask ? (
+                  editing ? (
+                  <div className="task-editor">
+                    <input autoFocus className="title-input" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} maxLength={300} />
+                    <textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="备注（可选）" maxLength={10000} />
+                    <div className="editor-footer">
+                      <label><CalendarDays size={15} /><input type="date" value={draft.dueDate} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value })} /></label>
+                      <label><Clock3 size={15} /><input type="datetime-local" value={draft.remindAt} onChange={(event) => setDraft({ ...draft, remindAt: event.target.value })} /></label>
+                      <label><Repeat2 size={15} /><select value={draft.recurrence} onChange={(event) => setDraft({ ...draft, recurrence: event.target.value as RecurrenceFrequency })}>{recurrenceOptions.map((option) => <option key={option} value={option}>{recurrenceLabels[option]}</option>)}</select></label>
+                      {!selectedTask.completedAt && <button className="completion-action" onClick={() => void toggleCompleted(selectedTask)}>完成</button>}
+                      {selectedTask.completedAt && <span className="completed-lock">已完成，不可恢复</span>}
+                      <button className="danger-icon" onClick={() => void deleteTask(selectedTask.id)} title="删除任务"><Trash2 size={16} /></button>
+                      <button className="text-button" onClick={() => setEditingId(null)}>取消</button>
+                      <button className="text-button primary" disabled={!draft.title.trim()} onClick={() => void saveTask()}>保存</button>
+                    </div>
+                  </div>
+                  ) : (
+                    <div className="day-read-panel">
+                      <h3>{selectedTask.title}</h3>
+                      {selectedTask.notes && <p>{selectedTask.notes}</p>}
+                      <div className="task-timing-row">
+                        {selectedTask.dueDate && <span><CalendarDays size={13} />{selectedTask.dueDate}</span>}
+                        {selectedTask.remindAt && <span><Clock3 size={13} />{formatReminder(selectedTask.remindAt)}</span>}
+                        {selectedTask.recurrence !== 'none' && <span><Repeat2 size={13} />{recurrenceLabels[selectedTask.recurrence]}</span>}
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  <div className="day-detail-placeholder">
+                    <CalendarDays size={24} />
+                    <span>选择左侧提醒查看详情</span>
+                  </div>
+                )}
               </div>
             </div>
           </aside>
-        </div>
-      )}
-
-      {!editing && snapshot.settings.layoutMode === 'compact' && (
-        <div className="shortcut-hint compact-shortcut-hint" aria-label={`按 ${snapshot.settings.globalShortcut} 进入编辑模式`}>
-          <Keyboard size={13} />
-          <kbd>{snapshot.settings.globalShortcut}</kbd>
-        </div>
-      )}
-
-      {editing && snapshot.settings.layoutMode === 'compact' && (
-        <div className="compact-edit-actions">
-          <button aria-label="打开设置" className={`sidebar-command ${runtimeWarning ? 'has-warning' : ''}`} onClick={() => setSettingsOpen(true)}>
-            <SettingsIcon size={18} />
-            <span>设置与状态</span>
-          </button>
-          <button className="sidebar-command primary" onClick={() => void exitEditing()}>
-            <Check size={18} />
-            <span>完成编辑</span>
-          </button>
         </div>
       )}
 
@@ -545,18 +551,6 @@ function App() {
             <div><span>SETTINGS</span><h2>设置与状态</h2></div>
             <button className="icon-button" onClick={() => setSettingsOpen(false)} title="关闭设置"><X size={20} /></button>
           </header>
-
-          <section>
-            <h3><LayoutPanelTop size={17} />窗口布局</h3>
-            <div className="theme-segmented layout-segmented" aria-label="窗口布局">
-              <button className={(pendingLayoutMode ?? snapshot.settings.layoutMode) === 'compact' ? 'active' : ''} onClick={() => void changeLayoutMode('compact')}>
-                <LayoutPanelTop size={15} />紧凑
-              </button>
-              <button className={(pendingLayoutMode ?? snapshot.settings.layoutMode) === 'expanded' ? 'active' : ''} onClick={() => void changeLayoutMode('expanded')}>
-                <LayoutPanelLeft size={15} />展开
-              </button>
-            </div>
-          </section>
 
           <section>
             <h3><Sun size={17} />外观主题</h3>

@@ -165,7 +165,7 @@ function parseSettings(value: unknown): Settings {
   const item = value as Record<string, unknown>;
   return {
     selectedView: isViewId(item.selectedView) ? item.selectedView : defaults.selectedView,
-    layoutMode: isLayoutMode(item.layoutMode) ? item.layoutMode : defaults.layoutMode,
+    layoutMode: 'expanded',
     windowBounds: parseWindowBounds(item.windowBounds, defaults.windowBounds, 'expanded'),
     compactWindowBounds: parseWindowBounds(item.compactWindowBounds, defaults.compactWindowBounds, 'compact'),
     theme: item.theme === 'dark' ? 'dark' : 'light',
@@ -414,6 +414,7 @@ export class TaskStore {
     return this.mutate(baseRevision, (draft) => {
       const task = draft.tasks.find((item) => item.id === id);
       if (!task) throw new Error('任务不存在。');
+      if (!completed && task.completedAt) throw new Error('已完成的任务不可恢复。');
       const completedAt = completed ? new Date().toISOString() : null;
       task.completedAt = completedAt;
       task.updatedAt = new Date().toISOString();
