@@ -540,14 +540,39 @@ function App() {
                 {selectedDayTasks.length === 0 ? (
                   <div className="day-empty">这一天还没有提醒。</div>
                 ) : selectedDayTasks.map((task) => (
-                  <button key={task.id} className={`day-event-item ${editingId === task.id ? 'active' : ''} ${task.completedAt ? 'completed' : ''}`} onClick={() => editing ? beginEdit(task) : setEditingId(task.id)}>
+                  <div
+                    key={task.id}
+                    className={`day-event-item ${editingId === task.id ? 'active' : ''} ${task.completedAt ? 'completed' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => editing ? beginEdit(task) : setEditingId(task.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        editing ? beginEdit(task) : setEditingId(task.id);
+                      }
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="day-complete-toggle"
+                      aria-label={task.completedAt ? '已完成' : '标记完成'}
+                      aria-disabled={Boolean(task.completedAt || !editing)}
+                      title={task.completedAt ? '已完成' : '标记完成'}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (!task.completedAt) void toggleCompleted(task);
+                      }}
+                    >
+                      {task.completedAt && <Check size={13} strokeWidth={3} />}
+                    </button>
                     <time>{task.recurrence === 'none' ? formatAgendaTime(task.remindAt) : recurrenceLabels[task.recurrence]}</time>
                     <span>
                       <strong>{task.title}</strong>
                       <small>{formatTaskSchedule(task)}</small>
                       {task.notes && <small>{task.notes}</small>}
                     </span>
-                  </button>
+                  </div>
                 ))}
               </div>
 

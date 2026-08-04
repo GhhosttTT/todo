@@ -1009,7 +1009,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .day-event-item {
   min-width: 0;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 18px 44px minmax(0, 1fr);
   gap: 9px;
   align-items: start;
   padding: 9px;
@@ -1019,6 +1019,34 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   background: rgba(246, 248, 251, .7);
   text-align: left;
   cursor: pointer;
+}
+
+.day-complete-toggle {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  margin-top: 1px;
+  border: 1.4px solid #87909d;
+  border-radius: 50%;
+  color: white;
+  background: transparent;
+  cursor: pointer;
+}
+
+.day-complete-toggle:hover {
+  border-color: var(--blue);
+  background: rgba(52, 120, 246, .1);
+}
+
+.day-complete-toggle[aria-disabled='true'] {
+  cursor: default;
+}
+
+.day-event-item.completed .day-complete-toggle {
+  border-color: var(--blue);
+  background: var(--blue);
 }
 
 .day-event-item:hover,
