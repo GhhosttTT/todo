@@ -88,6 +88,10 @@ export class WindowController {
     return { ...bounds, displayId: String(display.id), scaleFactor: display.scaleFactor };
   }
 
+  minimumSize(): { width: number; height: number } {
+    return minDimensionsForLayout(this.layoutMode);
+  }
+
   private enqueue(action: (generation: number) => Promise<void>): Promise<void> {
     const generation = ++this.generation;
     const next = this.transition.then(() => action(generation));
@@ -124,14 +128,14 @@ export class WindowController {
     await this.onBeforeExitEditing?.();
     if (generation !== this.generation) return;
     this.window.setAlwaysOnTop(false);
-    this.window.setResizable(false);
+    this.window.setResizable(true);
     this.setMode('rebinding');
     await this.bindForView(generation);
   }
 
   private async bindForView(generation: number): Promise<void> {
     this.window.setAlwaysOnTop(false);
-    this.window.setResizable(false);
+    this.window.setResizable(true);
     this.window.setSkipTaskbar(true);
     this.ensureVisible();
     this.window.showInactive();

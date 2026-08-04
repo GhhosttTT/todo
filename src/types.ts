@@ -62,6 +62,8 @@ export interface RuntimeStatus {
   hasUnpersistedChanges: boolean;
   shortcutActive: boolean;
   shortcutError?: string;
+  launchAtLoginActive: boolean;
+  launchAtLoginError?: string;
   desktop: DesktopBindingStatus;
   windowMode: WindowMode;
 }
@@ -107,6 +109,7 @@ export interface TodoApi {
   deleteTask(input: { id: string; baseRevision: number }): Promise<MutationResult>;
   reorderTasks(input: { ids: string[]; baseRevision: number }): Promise<MutationResult>;
   updateSettings(input: { settings: Partial<Pick<Settings, 'selectedView' | 'layoutMode' | 'theme' | 'globalShortcut' | 'launchAtLogin' | 'showCompleted' | 'notificationTimeoutType' | 'notificationDurationSeconds' | 'opacity' | 'backgroundIntensity'>>; baseRevision: number }): Promise<MutationResult>;
+  resizeWindow(input: { phase: 'start' | 'move' | 'end'; screenX: number; screenY: number }): Promise<RuntimeStatus>;
   setShortcutCapture(capturing: boolean): Promise<RuntimeStatus>;
   setEditMode(editing: boolean): Promise<RuntimeStatus>;
   retryDesktopBinding(): Promise<DesktopBindingStatus>;

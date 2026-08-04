@@ -352,6 +352,27 @@ function App() {
     }
   };
 
+  const startWindowResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!editing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const pointerId = event.pointerId;
+    event.currentTarget.setPointerCapture(pointerId);
+    void window.todo.resizeWindow({ phase: 'start', screenX: event.screenX, screenY: event.screenY });
+    const move = (moveEvent: PointerEvent) => {
+      void window.todo.resizeWindow({ phase: 'move', screenX: moveEvent.screenX, screenY: moveEvent.screenY });
+    };
+    const end = (upEvent: PointerEvent) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      void window.todo.resizeWindow({ phase: 'end', screenX: upEvent.screenX, screenY: upEvent.screenY });
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end, { once: true });
+    window.addEventListener('pointercancel', end, { once: true });
+  };
+
   useEffect(() => {
     if (settingsOpen || !shortcutRecording) return;
     void stopShortcutCapture();
@@ -653,6 +674,12 @@ function App() {
               <span><strong>开机自启</strong><small>Windows 登录后自动启动 Todo</small></span>
               <input type="checkbox" checked={snapshot.settings.launchAtLogin} onChange={(event) => void changeSettings({ launchAtLogin: event.target.checked })} />
             </label>
+            <StatusLine
+              ok={!snapshot.settings.launchAtLogin || snapshot.runtime.launchAtLoginActive}
+              text={snapshot.settings.launchAtLogin
+                ? (snapshot.runtime.launchAtLoginActive ? '已写入 Windows 开机启动项' : snapshot.runtime.launchAtLoginError ?? '开机启动项未确认')
+                : '未启用开机自启'}
+            />
             <label className="toggle-row">
               <span><strong>显示已完成</strong><small>在当前视图中保留完成项</small></span>
               <input type="checkbox" checked={snapshot.settings.showCompleted} onChange={(event) => void changeSettings({ showCompleted: event.target.checked })} />
@@ -670,7 +697,7 @@ function App() {
         </div>
       )}
 
-      {editing && <div className="resize-grip" aria-hidden="true" />}
+      {editing && <div className="resize-grip" role="separator" aria-label="拖动调整窗口大小" onPointerDown={startWindowResize} />}
     </div>
   );
 }

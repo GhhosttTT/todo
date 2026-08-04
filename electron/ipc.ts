@@ -11,8 +11,9 @@ interface IpcDependencies {
   runtime: RuntimeStatus;
   registerShortcut: (accelerator: string) => { ok: boolean; error?: string };
   setShortcutCapture: (capturing: boolean) => void;
-  applyLaunchAtLogin: (enabled: boolean) => void;
+  applyLaunchAtLogin: (enabled: boolean) => { ok: boolean; error?: string };
   applyLayoutMode: (settings: Settings) => void;
+  resizeWindow: (input: { phase: 'start' | 'move' | 'end'; screenX: number; screenY: number }) => Promise<void> | void;
   onStoreChanged?: () => void;
   transientSettings?: Partial<Settings>;
 }
@@ -65,16 +66,27 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   ipcMain.handle('todo:update-settings', async (_event, input): Promise<MutationResult> => {
     const settings = input.settings as Partial<Settings>;
     const oldShortcut = deps.store.getSnapshot().settings.globalShortcut;
+    const oldLaunchAtLogin = deps.store.getSnapshot().settings.launchAtLogin;
     if (settings.globalShortcut !== undefined && settings.globalShortcut !== oldShortcut) {
       const shortcut = deps.registerShortcut(settings.globalShortcut);
       if (!shortcut.ok) return { ok: false, snapshot: snapshot(), error: shortcut.error ?? '快捷键注册失败。' };
     }
+    if (settings.launchAtLogin !== undefined && settings.launchAtLogin !== oldLaunchAtLogin) {
+      const launch = deps.applyLaunchAtLogin(settings.launchAtLogin);
+      if (!launch.ok) return { ok: false, snapshot: snapshot(), error: launch.error ?? '开机自启设置失败。' };
+    }
     const changed = await mutation(() => deps.store.updateSettings(input.baseRevision, settings));
     if (changed.ok && settings.opacity !== undefined) deps.window.setOpacity(Math.min(1, Math.max(0.72, settings.opacity)));
-    if (changed.ok && settings.launchAtLogin !== undefined) deps.applyLaunchAtLogin(settings.launchAtLogin);
     if (changed.ok && settings.layoutMode !== undefined) deps.applyLayoutMode(changed.snapshot.settings);
     if (!changed.ok && settings.globalShortcut !== undefined && settings.globalShortcut !== oldShortcut) deps.registerShortcut(oldShortcut);
+    if (!changed.ok && settings.launchAtLogin !== undefined && settings.launchAtLogin !== oldLaunchAtLogin) deps.applyLaunchAtLogin(oldLaunchAtLogin);
     return changed;
+  });
+
+  ipcMain.handle('todo:resize-window', async (_event, input) => {
+    if (!input || typeof input !== 'object') throw new Error('窗口缩放参数无效。');
+    await deps.resizeWindow(input);
+    return structuredClone(deps.runtime);
   });
 
   ipcMain.handle('todo:set-shortcut-capture', (_event, capturing: unknown) => {
@@ -95,7 +107,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 export function clearIpcHandlers(): void {
   for (const channel of [
     'todo:get-snapshot', 'todo:create-task', 'todo:update-task', 'todo:set-completed', 'todo:delete-task',
-    'todo:reorder-tasks', 'todo:update-settings', 'todo:set-shortcut-capture', 'todo:set-edit-mode', 'todo:retry-desktop-binding',
+    'todo:reorder-tasks', 'todo:update-settings', 'todo:resize-window', 'todo:set-shortcut-capture', 'todo:set-edit-mode', 'todo:retry-desktop-binding',
   ]) ipcMain.removeHandler(channel);
 }
 

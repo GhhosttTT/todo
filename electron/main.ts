@@ -41,6 +41,7 @@ let activeShortcut: string | undefined;
 let suspendedShortcut: string | undefined;
 let boundsSaveTimer: NodeJS.Timeout | undefined;
 let updateTrayMenu: (() => void) | undefined;
+let resizeSession: { startX: number; startY: number; bounds: Electron.Rectangle } | undefined;
 
 const store = new TaskStore(paths.stateFile);
 const runtime: RuntimeStatus = {
@@ -51,6 +52,7 @@ const runtime: RuntimeStatus = {
   readOnly: false,
   hasUnpersistedChanges: false,
   shortcutActive: false,
+  launchAtLoginActive: false,
   desktop: { state: 'pending' },
   windowMode: 'starting',
 };
@@ -70,13 +72,29 @@ function broadcastRuntime(): void {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('todo:runtime-changed', structuredClone(runtime));
 }
 
-function applyLaunchAtLogin(enabled: boolean): void {
-  if (process.platform !== 'win32') return;
-  app.setLoginItemSettings({
-    openAtLogin: enabled,
-    path: hostExecutablePath,
-    args: [],
-  });
+function applyLaunchAtLogin(enabled: boolean): { ok: boolean; error?: string } {
+  if (process.platform !== 'win32') {
+    runtime.launchAtLoginActive = false;
+    runtime.launchAtLoginError = '当前平台不支持 Windows 开机自启。';
+    return { ok: false, error: runtime.launchAtLoginError };
+  }
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: enabled,
+      path: hostExecutablePath,
+      args: [],
+    });
+    const actual = app.getLoginItemSettings({ path: hostExecutablePath, args: [] }).openAtLogin;
+    runtime.launchAtLoginActive = actual;
+    runtime.launchAtLoginError = actual === enabled ? undefined : 'Windows 没有接受这次开机自启设置。请确认当前 exe 路径仍然存在且未被安全软件拦截。';
+    broadcastRuntime();
+    return actual === enabled ? { ok: true } : { ok: false, error: runtime.launchAtLoginError };
+  } catch (error) {
+    runtime.launchAtLoginActive = false;
+    runtime.launchAtLoginError = error instanceof Error ? error.message : '开机自启设置失败。';
+    broadcastRuntime();
+    return { ok: false, error: runtime.launchAtLoginError };
+  }
 }
 
 function registerGlobalShortcut(accelerator: string): { ok: boolean; error?: string } {
@@ -175,6 +193,25 @@ async function persistCurrentBounds(): Promise<void> {
   broadcastSnapshot();
 }
 
+async function resizeWindow(input: { phase: 'start' | 'move' | 'end'; screenX: number; screenY: number }): Promise<void> {
+  if (!mainWindow || !controller) return;
+  if (input.phase === 'start') {
+    resizeSession = { startX: input.screenX, startY: input.screenY, bounds: mainWindow.getBounds() };
+    return;
+  }
+  if (input.phase === 'move' && resizeSession) {
+    const minimum = controller.minimumSize();
+    const nextWidth = Math.max(minimum.width, Math.round(resizeSession.bounds.width + input.screenX - resizeSession.startX));
+    const nextHeight = Math.max(minimum.height, Math.round(resizeSession.bounds.height + input.screenY - resizeSession.startY));
+    mainWindow.setBounds({ ...resizeSession.bounds, width: nextWidth, height: nextHeight }, false);
+    return;
+  }
+  if (input.phase === 'end') {
+    resizeSession = undefined;
+    await persistCurrentBounds();
+  }
+}
+
 async function createWindow(): Promise<void> {
   const loaded = store.load();
   const initialBounds = loaded.settings.layoutMode === 'compact'
@@ -196,7 +233,7 @@ async function createWindow(): Promise<void> {
     minWidth: MINIMUM_WINDOW_WIDTH,
     minHeight: MINIMUM_WINDOW_HEIGHT,
     height: initialBounds.height || DEFAULT_WINDOW_HEIGHT,
-    resizable: false,
+    resizable: true,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
@@ -237,6 +274,7 @@ async function createWindow(): Promise<void> {
       const bounds = settings.layoutMode === 'compact' ? settings.compactWindowBounds : settings.windowBounds;
       controller?.applyLayoutBounds(bounds, settings.layoutMode);
     },
+    resizeWindow,
     onStoreChanged: () => reminders?.scheduleAll(),
     transientSettings: captureTheme ? { theme: captureTheme } : undefined,
   });

@@ -101,10 +101,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   z-index: 24;
   right: 7px;
   bottom: 7px;
-  width: 16px;
-  height: 16px;
-  pointer-events: none;
-  opacity: .42;
+  width: 22px;
+  height: 22px;
+  cursor: nwse-resize;
+  pointer-events: auto;
+  opacity: .48;
+  -webkit-app-region: no-drag;
   background:
     linear-gradient(135deg, transparent 0 52%, rgba(91, 98, 110, .9) 53% 57%, transparent 58%),
     linear-gradient(135deg, transparent 0 68%, rgba(91, 98, 110, .75) 69% 73%, transparent 74%),

@@ -9,6 +9,7 @@ const api: TodoApi = {
   deleteTask: (input) => ipcRenderer.invoke('todo:delete-task', input),
   reorderTasks: (input) => ipcRenderer.invoke('todo:reorder-tasks', input),
   updateSettings: (input) => ipcRenderer.invoke('todo:update-settings', input),
+  resizeWindow: (input) => ipcRenderer.invoke('todo:resize-window', input),
   setShortcutCapture: (capturing) => ipcRenderer.invoke('todo:set-shortcut-capture', capturing),
   setEditMode: (editing) => ipcRenderer.invoke('todo:set-edit-mode', editing),
   retryDesktopBinding: () => ipcRenderer.invoke('todo:retry-desktop-binding'),
