@@ -585,6 +585,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   border-right: 0;
   border-bottom: 1px solid rgba(92, 99, 110, .14);
   background: rgba(250, 251, 253, calc(.82 + var(--background-intensity) * .12));
+  -webkit-app-region: drag;
 }
 
 .calendar-toolbar .calendar-drag-strip {
@@ -601,7 +602,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   display: flex;
   align-items: center;
   gap: 12px;
-  -webkit-app-region: no-drag;
+  -webkit-app-region: drag;
 }
 
 .toolbar-command {
@@ -614,6 +615,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
+  -webkit-app-region: no-drag;
 }
 
 .toolbar-command:hover { background: white; }
@@ -634,12 +636,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   width: min(250px, 28vw);
   height: 32px;
   margin: 0 0 0 auto;
+  -webkit-app-region: no-drag;
 }
 
 .toolbar-actions {
   display: flex;
   gap: 7px;
   margin-left: auto;
+  -webkit-app-region: no-drag;
 }
 
 .calendar-search-box + .toolbar-actions { margin-left: 0; }
@@ -649,6 +653,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   position: static;
   margin-left: auto;
   background: rgba(255, 255, 255, .48);
+  -webkit-app-region: drag;
 }
 
 .calendar-month-pane {
@@ -669,6 +674,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   gap: 0;
   padding: 14px 16px 16px;
   overflow: hidden;
+  -webkit-app-region: drag;
 }
 
 .calendar-week-header {
@@ -679,6 +685,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
+  -webkit-app-region: drag;
 }
 
 .calendar-week-header span {
